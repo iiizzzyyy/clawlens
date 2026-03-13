@@ -1,0 +1,7 @@
+{"type":"session","sessionId":"sess_ghi789","agentId":"main","channel":"whatsapp","createdAt":"2026-03-13T12:00:00.000Z","metadata":{"senderId":"987654321"}}
+{"type":"message","id":"msg_user_01","timestamp":"2026-03-13T12:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"What is 2+2?"}]}}
+{"type":"message","id":"msg_asst_01","timestamp":"2026-03-13T12:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"2+2 equals 4."}],"usage":{"inputTokens":750,"outputTokens":15,"cost":{"input":0.00225,"output":0.000075,"total":0.002325}},"model":"claude-sonnet-4-20250514"}}
+{"type":"message","id":"msg_user_02","timestamp":"2026-03-13T12:00:10.000Z","message":{"role":"user","content":[{"type":"text","text":"And what is 10 * 5?"}]}}
+{"type":"message","id":"msg_asst_02","timestamp":"2026-03-13T12:00:11.000Z","message":{"role":"assistant","content":[{"type":"text","text":"10 * 5 equals 50."}],"usage":{"inputTokens":800,"outputTokens":18,"cost":{"input":0.00240,"output":0.000090,"total":0.00249}},"model":"claude-sonnet-4-20250514"}}
+{"type":"message","id":"msg_user_03","timestamp":"2026-03-13T12:00:20.000Z","message":{"role":"user","content":[{"type":"text","text":"Thanks!"}]}}
+{"type":"message","id":"msg_asst_03","timestamp":"2026-03-13T12:00:21.000Z","message":{"role":"assistant","content":[{"type":"text","text":"You're welcome! Let me know if you need anything else."}],"usage":{"inputTokens":850,"outputTokens":25,"cost":{"input":0.00255,"output":0.000125,"total":0.002675}},"model":"claude-sonnet-4-20250514"}}

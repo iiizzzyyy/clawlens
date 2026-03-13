@@ -1,0 +1,15 @@
+# Screenshots Directory
+
+This directory contains screenshots for the README and documentation.
+
+## TODO
+
+- [ ] session-replay.png - Session replay timeline screenshot
+- [ ] analytics.png - Analytics dashboard screenshot  
+- [ ] topology.png - Agent topology graph screenshot
+
+Screenshots should be:
+- PNG format
+- Max width: 1200px
+- Compressed for web (use TinyPNG or similar)
+- Representative of actual functionality

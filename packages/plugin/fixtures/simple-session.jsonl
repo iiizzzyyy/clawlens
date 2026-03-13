@@ -1,0 +1,3 @@
+{"type":"session","sessionId":"sess_abc123","agentId":"main","channel":"telegram","createdAt":"2026-03-13T10:30:00.000Z","metadata":{"senderId":"123456789","conversationId":"conv_xyz"}}
+{"type":"message","id":"msg_user_01","timestamp":"2026-03-13T10:30:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Hello, can you tell me what time it is?"}]}}
+{"type":"message","id":"msg_asst_01","timestamp":"2026-03-13T10:30:03.500Z","message":{"role":"assistant","content":[{"type":"text","text":"Based on the current timestamp, it's 10:30 AM on March 13, 2026."}],"usage":{"inputTokens":850,"outputTokens":42,"cost":{"input":0.00255,"output":0.000210,"total":0.00276}},"model":"claude-sonnet-4-20250514"}}

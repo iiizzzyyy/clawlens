@@ -1,0 +1,58 @@
+{
+  "id": "clawlens",
+  "name": "ClawLens",
+  "version": "0.1.0",
+  "kind": "observability",
+  "description": "Investigation and debugging layer for OpenClaw - session replay, analytics, and agent topology",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "dbPath": {
+        "type": "string",
+        "description": "Path to SQLite database file",
+        "default": "~/.openclaw/clawlens/clawlens.db"
+      },
+      "retentionDays": {
+        "type": "integer",
+        "description": "Number of days to retain span data (0 = infinite)",
+        "default": 90,
+        "minimum": 0
+      },
+      "backfillOnStart": {
+        "type": "boolean",
+        "description": "Import existing JSONL sessions on first run",
+        "default": true
+      },
+      "excludeAgents": {
+        "type": "array",
+        "description": "Agent IDs to exclude from capture",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "excludeChannels": {
+        "type": "array",
+        "description": "Channels to exclude from capture",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      }
+    }
+  },
+  "uiHints": {
+    "dbPath": {
+      "label": "Database Path",
+      "placeholder": "~/.openclaw/clawlens/clawlens.db"
+    },
+    "retentionDays": {
+      "label": "Retention (days)",
+      "placeholder": "90"
+    },
+    "backfillOnStart": {
+      "label": "Backfill on Start"
+    }
+  }
+}
