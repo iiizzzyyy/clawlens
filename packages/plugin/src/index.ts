@@ -76,7 +76,7 @@ const pluginState: {
  *
  * @param api - OpenClaw Plugin API
  */
-export default function register(api: PluginAPI): void {
+function register(api: PluginAPI): void {
   const logger = api.logger;
 
   logger.info('[clawlens] Initializing ClawLens plugin');
@@ -193,6 +193,12 @@ async function runBackfill(
     logger.info(`[clawlens] Backfill error: ${error}`);
   }
 }
+
+// Attach plugin metadata to the register function
+register.id = 'clawlens';
+
+// Export as default
+export default register;
 
 /**
  * Plugin shutdown handler
