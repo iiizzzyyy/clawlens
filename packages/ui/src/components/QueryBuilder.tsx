@@ -45,32 +45,16 @@ function QueryBuilder({ onParamsChange, defaultTimeRange = 'week' }: QueryBuilde
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: '1rem',
-        padding: '1rem',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        marginBottom: '1.5rem',
-        alignItems: 'flex-end',
-        flexWrap: 'wrap',
-      }}
-    >
+    <div className="flex gap-4 p-4 bg-slate-800 rounded-lg mb-6 items-end flex-wrap border border-slate-700">
       {/* Time Range */}
-      <div style={{ minWidth: '150px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+      <div className="min-w-[150px]">
+        <label className="block text-sm text-slate-300 mb-2">
           Time Range
         </label>
         <select
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value as 'day' | 'week' | 'month' | 'all')}
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            borderRadius: '4px',
-            border: '1px solid #ddd',
-          }}
+          className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
         >
           <option value="day">Last 24 hours</option>
           <option value="week">Last 7 days</option>
@@ -80,8 +64,8 @@ function QueryBuilder({ onParamsChange, defaultTimeRange = 'week' }: QueryBuilde
       </div>
 
       {/* Agent Filter */}
-      <div style={{ minWidth: '150px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+      <div className="min-w-[150px]">
+        <label className="block text-sm text-slate-300 mb-2">
           Agent ID (optional)
         </label>
         <input
@@ -89,18 +73,13 @@ function QueryBuilder({ onParamsChange, defaultTimeRange = 'week' }: QueryBuilde
           value={agentId}
           onChange={(e) => setAgentId(e.target.value)}
           placeholder="Filter by agent"
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            borderRadius: '4px',
-            border: '1px solid #ddd',
-          }}
+          className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
       </div>
 
       {/* Channel Filter */}
-      <div style={{ minWidth: '150px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+      <div className="min-w-[150px]">
+        <label className="block text-sm text-slate-300 mb-2">
           Channel (optional)
         </label>
         <input
@@ -108,18 +87,13 @@ function QueryBuilder({ onParamsChange, defaultTimeRange = 'week' }: QueryBuilde
           value={channel}
           onChange={(e) => setChannel(e.target.value)}
           placeholder="e.g., slack, telegram"
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            borderRadius: '4px',
-            border: '1px solid #ddd',
-          }}
+          className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
       </div>
 
       {/* Model Filter */}
-      <div style={{ minWidth: '150px' }}>
-        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+      <div className="min-w-[150px]">
+        <label className="block text-sm text-slate-300 mb-2">
           Model (optional)
         </label>
         <input
@@ -127,27 +101,14 @@ function QueryBuilder({ onParamsChange, defaultTimeRange = 'week' }: QueryBuilde
           value={model}
           onChange={(e) => setModel(e.target.value)}
           placeholder="e.g., claude-sonnet-4"
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            borderRadius: '4px',
-            border: '1px solid #ddd',
-          }}
+          className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
       </div>
 
       {/* Apply Button */}
       <button
         onClick={handleApply}
-        style={{
-          padding: '0.5rem 1.5rem',
-          backgroundColor: '#2563eb',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontWeight: 500,
-        }}
+        className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded font-medium cursor-pointer transition-colors"
       >
         Apply Filters
       </button>

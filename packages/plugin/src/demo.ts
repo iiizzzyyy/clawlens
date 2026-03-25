@@ -41,8 +41,8 @@ export function getDemoFixturesPath(): string {
   try {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    // From dist/demo.js -> fixtures/demo/
-    return join(__dirname, '..', 'fixtures', 'demo');
+    // From dist/demo.js -> dist/fixtures/demo/
+    return join(__dirname, 'fixtures', 'demo');
   } catch {
     // Fallback for environments where import.meta.url doesn't work
     return join(process.cwd(), 'fixtures', 'demo');

@@ -14,9 +14,9 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const navItems = [
+    { path: '/bots', label: 'Bots', icon: '🤖' },
     { path: '/', label: 'Sessions', icon: '📋' },
     { path: '/analytics', label: 'Analytics', icon: '📊' },
-    { path: '/topology', label: 'Topology', icon: '🔗' },
   ];
 
   const isActive = (path: string) => {

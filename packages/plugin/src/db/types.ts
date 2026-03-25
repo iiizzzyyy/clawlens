@@ -125,6 +125,7 @@ export interface SessionSummary {
   totalTokensOut: number;
   spanCount: number;
   errorCount: number;
+  toolCalls: number;
   status: SpanStatus;
 }
 

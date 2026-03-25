@@ -20,6 +20,9 @@ export class SpanContext {
   // Map of sessionId -> current turn span ID (special case for tools/llm_calls)
   private currentTurnSpans = new Map<string, string>();
 
+  // Map of childSessionId -> delegation spanId (for closing delegation spans)
+  private delegationSpans = new Map<string, string>();
+
   /**
    * Push a span onto the session's stack
    */
@@ -103,5 +106,26 @@ export class SpanContext {
    */
   hasActiveSpans(sessionId: string): boolean {
     return this.getStackDepth(sessionId) > 0;
+  }
+
+  /**
+   * Track a delegation span by child session ID
+   */
+  trackDelegation(childSessionId: string, spanId: string): void {
+    this.delegationSpans.set(childSessionId, spanId);
+  }
+
+  /**
+   * Get the delegation span ID for a child session
+   */
+  getDelegationSpan(childSessionId: string): string | null {
+    return this.delegationSpans.get(childSessionId) ?? null;
+  }
+
+  /**
+   * Remove delegation tracking for a child session
+   */
+  clearDelegation(childSessionId: string): void {
+    this.delegationSpans.delete(childSessionId);
   }
 }

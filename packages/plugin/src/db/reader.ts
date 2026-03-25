@@ -32,6 +32,13 @@ export class SpanReader {
   }
 
   /**
+   * Get the underlying database instance
+   */
+  getDatabase(): Database.Database {
+    return this.db;
+  }
+
+  /**
    * Get a single span by ID
    */
   getSpan(id: string): Span | null {
@@ -89,7 +96,8 @@ export class SpanReader {
         COALESCE(agg.tokens_in, 0) as tokens_in,
         COALESCE(agg.tokens_out, 0) as tokens_out,
         COALESCE(agg.span_count, 0) as span_count,
-        COALESCE(agg.error_count, 0) as error_count
+        COALESCE(agg.error_count, 0) as error_count,
+        COALESCE(agg.tool_calls, 0) as tool_calls
       FROM spans s
       LEFT JOIN (
         SELECT
@@ -98,7 +106,8 @@ export class SpanReader {
           SUM(tokens_in) as tokens_in,
           SUM(tokens_out) as tokens_out,
           COUNT(*) as span_count,
-          SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count
+          SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
+          COUNT(CASE WHEN span_type = 'tool_exec' THEN 1 END) as tool_calls
         FROM spans
         GROUP BY session_id
       ) agg ON s.session_id = agg.session_id
@@ -123,6 +132,7 @@ export class SpanReader {
       tokens_out: number;
       span_count: number;
       error_count: number;
+      tool_calls: number;
     }>;
 
     return rows.map((row) => ({
@@ -137,6 +147,7 @@ export class SpanReader {
       totalTokensOut: row.tokens_out,
       spanCount: row.span_count,
       errorCount: row.error_count,
+      toolCalls: row.tool_calls,
       status: row.status as 'ok' | 'error' | 'timeout' | 'cancelled',
     }));
   }

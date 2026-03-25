@@ -12,7 +12,7 @@ import CostBar from '../components/CostBar';
 import Timeline from '../components/Timeline';
 
 // Use mock data in development when API is not available
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 export default function Replay() {
   const { sessionId } = useParams<{ sessionId: string }>();

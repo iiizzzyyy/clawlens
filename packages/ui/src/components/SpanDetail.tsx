@@ -157,7 +157,7 @@ export default function SpanDetail({ span, onClose }: SpanDetailProps) {
                 <h4 className="text-sm font-medium text-slate-400 mb-1">Target Session</h4>
                 <Link
                   to={`/replay/${meta.targetSessionId}`}
-                  className="text-blue-400 hover:text-blue-300 underline"
+                  className="text-accent-400 hover:text-accent-300 underline"
                 >
                   View session: {String(meta.targetSessionId)}
                 </Link>

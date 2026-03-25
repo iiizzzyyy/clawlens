@@ -17,7 +17,6 @@ export default function SessionList() {
 
   // Filters
   const [agentId, setAgentId] = useState('');
-  const [channel, setChannel] = useState('');
   const [status, setStatus] = useState<SpanStatus | ''>('');
   const [fromTs, setFromTs] = useState('');
   const [toTs, setToTs] = useState('');
@@ -30,12 +29,11 @@ export default function SessionList() {
   const filters: SessionListFilters = useMemo(() => {
     const f: SessionListFilters = { limit: 100 };
     if (agentId) f.agentId = agentId;
-    if (channel) f.channel = channel;
     if (status) f.status = status as SpanStatus;
     if (fromTs) f.fromTs = new Date(fromTs).getTime();
     if (toTs) f.toTs = new Date(toTs).getTime();
     return f;
-  }, [agentId, channel, status, fromTs, toTs]);
+  }, [agentId, status, fromTs, toTs]);
 
   // Fetch sessions
   const { sessions, loading, error, refetch } = useSessions(filters);
@@ -64,11 +62,6 @@ export default function SessionList() {
     () => Array.from(new Set(sessions.map((s) => s.agentId))),
     [sessions]
   );
-  const uniqueChannels = useMemo(
-    () => Array.from(new Set(sessions.map((s) => s.channel).filter(Boolean))),
-    [sessions]
-  );
-
   // Handlers
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -80,12 +73,11 @@ export default function SessionList() {
   };
 
   const handleRowClick = (sessionId: string) => {
-    navigate(`/clawlens/replay/${sessionId}`);
+    navigate(`/replay/${sessionId}`);
   };
 
   const resetFilters = () => {
     setAgentId('');
-    setChannel('');
     setStatus('');
     setFromTs('');
     setToTs('');
@@ -114,8 +106,10 @@ export default function SessionList() {
     return `${(ms / 60000).toFixed(1)}m`;
   };
 
-  const formatCost = (usd: number) => {
-    return `$${usd.toFixed(4)}`;
+  const formatTokens = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
   };
 
   const formatTimestamp = (ts: number) => {
@@ -139,29 +133,12 @@ export default function SessionList() {
             <select
               value={agentId}
               onChange={(e) => setAgentId(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             >
               <option value="">All agents</option>
               {uniqueAgents.map((agent) => (
                 <option key={agent} value={agent}>
                   {agent}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Channel filter */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Channel</label>
-            <select
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All channels</option>
-              {uniqueChannels.map((ch) => (
-                <option key={ch} value={ch || ''}>
-                  {ch}
                 </option>
               ))}
             </select>
@@ -173,7 +150,7 @@ export default function SessionList() {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as SpanStatus | '')}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             >
               <option value="">All statuses</option>
               <option value="ok">OK</option>
@@ -190,7 +167,7 @@ export default function SessionList() {
               type="datetime-local"
               value={fromTs}
               onChange={(e) => setFromTs(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
 
@@ -201,7 +178,7 @@ export default function SessionList() {
               type="datetime-local"
               value={toTs}
               onChange={(e) => setToTs(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
 
@@ -248,12 +225,6 @@ export default function SessionList() {
                     Agent {sortField === 'agentId' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    onClick={() => handleSort('channel')}
-                    className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
-                  >
-                    Channel {sortField === 'channel' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th
                     onClick={() => handleSort('startTs')}
                     className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
                   >
@@ -266,16 +237,34 @@ export default function SessionList() {
                     Duration {sortField === 'durationMs' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
-                    onClick={() => handleSort('totalCost')}
+                    onClick={() => handleSort('totalTokensIn')}
                     className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
                   >
-                    Cost {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Tokens In {sortField === 'totalTokensIn' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    onClick={() => handleSort('totalTokensOut')}
+                    className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
+                  >
+                    Tokens Out {sortField === 'totalTokensOut' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    onClick={() => handleSort('toolCalls')}
+                    className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
+                  >
+                    Tools {sortField === 'toolCalls' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
                     onClick={() => handleSort('status')}
                     className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
                   >
                     Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    onClick={() => handleSort('errorCount')}
+                    className="px-4 py-3 text-left font-medium cursor-pointer hover:bg-slate-600"
+                  >
+                    Errors {sortField === 'errorCount' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th
                     onClick={() => handleSort('spanCount')}
@@ -288,7 +277,7 @@ export default function SessionList() {
               <tbody className="divide-y divide-slate-700">
                 {sortedSessions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                       No sessions found
                     </td>
                   </tr>
@@ -302,12 +291,13 @@ export default function SessionList() {
                       )}`}
                     >
                       <td className="px-4 py-3 font-medium">{session.agentId}</td>
-                      <td className="px-4 py-3 text-slate-300">{session.channel || '-'}</td>
                       <td className="px-4 py-3 text-sm text-slate-400">
                         {formatTimestamp(session.startTs)}
                       </td>
                       <td className="px-4 py-3">{formatDuration(session.durationMs)}</td>
-                      <td className="px-4 py-3 font-mono">{formatCost(session.totalCost)}</td>
+                      <td className="px-4 py-3 font-mono text-slate-300">{formatTokens(session.totalTokensIn)}</td>
+                      <td className="px-4 py-3 font-mono text-slate-300">{formatTokens(session.totalTokensOut)}</td>
+                      <td className="px-4 py-3 text-slate-300">{session.toolCalls}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusColor(
@@ -317,6 +307,7 @@ export default function SessionList() {
                           {session.status}
                         </span>
                       </td>
+                      <td className={`px-4 py-3 ${session.errorCount > 0 ? 'text-red-400' : 'text-slate-400'}`}>{session.errorCount}</td>
                       <td className="px-4 py-3 text-slate-400">{session.spanCount}</td>
                     </tr>
                   ))

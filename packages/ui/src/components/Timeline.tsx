@@ -136,7 +136,7 @@ export default function Timeline({ sessionTree }: TimelineProps) {
             return (
               <div
                 key={turn.id}
-                className={`relative ml-12 ${isFocused ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}
+                className={`relative ml-12 ${isFocused ? 'ring-2 ring-accent-500 rounded-lg' : ''}`}
               >
                 {/* Timeline dot */}
                 <div

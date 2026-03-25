@@ -182,7 +182,12 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'subagent_spawned',
     (event, ctx) => {
       try {
-        onSubagentSpawned(event, ctx as SubagentSpawnedContext, writer, spanContext);
+        const typedCtx = ctx as SubagentSpawnedContext;
+        api.logger.info('[clawlens] subagent_spawned hook fired', {
+          targetAgentId: typedCtx.targetAgentId,
+          childSessionId: typedCtx.childSessionId,
+        });
+        onSubagentSpawned(event, typedCtx, writer, spanContext);
       } catch (error) {
         api.logger.error('[clawlens] Error in subagent_spawned hook:', error);
       }
@@ -194,7 +199,12 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'subagent_ended',
     (event, ctx) => {
       try {
-        onSubagentEnded(event, ctx as SubagentEndedContext, writer, spanContext);
+        const typedCtx = ctx as SubagentEndedContext;
+        api.logger.info('[clawlens] subagent_ended hook fired', {
+          childSessionId: typedCtx.childSessionId,
+          success: typedCtx.success,
+        });
+        onSubagentEnded(event, typedCtx, writer, spanContext);
       } catch (error) {
         api.logger.error('[clawlens] Error in subagent_ended hook:', error);
       }

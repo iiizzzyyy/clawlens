@@ -56,6 +56,7 @@ export interface SessionSummary {
   totalTokensOut: number;
   spanCount: number;
   errorCount: number;
+  toolCalls: number;
   status: SpanStatus;
 }
 
@@ -236,6 +237,56 @@ export async function fetchAnalytics(
   const queryString = queryParams.toString();
   const path = `/analytics/${queryType}${queryString ? `?${queryString}` : ''}`;
   return fetchApi<AnalyticsResult>(path);
+}
+
+// =============================================================================
+// Bots
+// =============================================================================
+
+export interface DelegationEntry {
+  agentId: string;
+  count: number;
+  failureCount: number;
+}
+
+export interface BotInfo {
+  id: string;
+  name: string;
+  emoji: string | null;
+  status: 'working' | 'online' | 'idle' | 'offline';
+  model: string | null;
+  provider: string | null;
+  channels: string[];
+  sessionCount: number;
+  messageCount: number;
+  totalTokens: number;
+  tokensIn: number;
+  tokensOut: number;
+  totalCost: number;
+  errorCount: number;
+  toolCalls: number;
+  llmCalls: number;
+  lastActiveTs: number | null;
+  avgResponseMs: number | null;
+  tokenSparkline: number[];
+  responseSparkline: number[];
+  delegatesTo: DelegationEntry[];
+  delegatedFrom: DelegationEntry[];
+}
+
+/**
+ * Fetch bots overview data
+ */
+export async function fetchBots(params?: {
+  fromTs?: number;
+  toTs?: number;
+}): Promise<BotInfo[]> {
+  const queryParams = new URLSearchParams();
+  if (params?.fromTs) queryParams.set('fromTs', params.fromTs.toString());
+  if (params?.toTs) queryParams.set('toTs', params.toTs.toString());
+  const queryString = queryParams.toString();
+  const path = `/bots${queryString ? `?${queryString}` : ''}`;
+  return fetchApi<BotInfo[]>(path);
 }
 
 /**

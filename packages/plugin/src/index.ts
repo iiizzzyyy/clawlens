@@ -39,6 +39,7 @@ import { registerRoutes, type PluginRouteConfig } from './api/routes.js';
 import { importDirectory } from './importers/jsonl.js';
 import { loadConfig, expandPath, type ClawLensConfig } from './config.js';
 import { initializeDemoIfNeeded } from './demo.js';
+import { OpenClawConfigReader } from './config/openclaw-config.js';
 
 /**
  * Get the UI dist path (relative to this file when bundled)
@@ -48,7 +49,7 @@ function getUiDistPath(): string {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     // UI is built to dist/ui/ directory
-    return join(__dirname, '..', 'ui');
+    return join(__dirname, 'ui');
   } catch {
     // Fallback for environments where import.meta.url doesn't work
     return join(process.cwd(), 'dist', 'ui');
@@ -107,6 +108,9 @@ function register(api: PluginAPI): void {
     logger.info('[clawlens] Registering lifecycle hooks');
     registerHooks(api, writer);
 
+    // Initialize OpenClaw config reader for agent metadata
+    const configReader = new OpenClawConfigReader(undefined, logger);
+
     // Register HTTP routes
     const uiDistPath = getUiDistPath();
     logger.info(`[clawlens] Registering HTTP routes (UI path: ${uiDistPath})`);
@@ -115,7 +119,8 @@ function register(api: PluginAPI): void {
       (route: PluginRouteConfig) => api.registerHttpRoute(route),
       reader,
       uiDistPath,
-      logger
+      logger,
+      configReader
     );
 
     // Initialize demo mode if needed (or run backfill)
@@ -147,14 +152,10 @@ async function initializeDemoMode(
   logger: { info: (msg: string, ...args: unknown[]) => void; error: (msg: string, ...args: unknown[]) => void }
 ): Promise<void> {
   // Try demo mode first
-  const demoEnabled = await initializeDemoIfNeeded(reader, writer, config, logger);
+  await initializeDemoIfNeeded(reader, writer, config, logger);
 
-  // If demo mode was activated, skip backfill
-  if (demoEnabled) {
-    return;
-  }
-
-  // Otherwise run backfill if enabled
+  // Always run backfill if enabled — real sessions should be
+  // imported alongside demo data
   if (config.backfillOnStart) {
     const sessionsDir = expandPath(config.sessionsDir);
     logger.info(`[clawlens] Starting JSONL backfill from ${sessionsDir}`);

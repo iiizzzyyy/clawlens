@@ -30,9 +30,11 @@ interface AnalyticsCardProps {
   queryType: string;
   params: AnalyticsParams;
   chartType: 'bar' | 'line' | 'stacked';
+  valueField: string;
+  secondaryValueField?: string;
 }
 
-function AnalyticsCard({ title, description, queryType, params, chartType }: AnalyticsCardProps) {
+function AnalyticsCard({ title, description, queryType, params, chartType, valueField, secondaryValueField }: AnalyticsCardProps) {
   const navigate = useNavigate();
   const { data, loading, error } = useAnalytics(queryType, params);
 
@@ -50,15 +52,7 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
   const renderChart = () => {
     if (!data || !data.data || data.data.length === 0) {
       return (
-        <div
-          style={{
-            height: '200px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#999',
-          }}
-        >
+        <div className="h-[200px] flex items-center justify-center text-slate-500">
           No data available
         </div>
       );
@@ -67,20 +61,22 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
     const chartData = data.data.map((item: any) => ({
       ...item,
       name: item.label || item.agentId || item.toolName || item.channel || item.bucket || item.spanType,
+      value: item[valueField],
+      ...(secondaryValueField ? { count: item[secondaryValueField] } : {}),
     }));
 
-    const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    const COLORS = ['#ff5c5c', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
     if (chartType === 'bar') {
       return (
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" fontSize={12} />
-            <YAxis fontSize={12} />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e2028" />
+            <XAxis dataKey="name" fontSize={12} stroke="#8e8e93" />
+            <YAxis fontSize={12} stroke="#8e8e93" />
+            <Tooltip contentStyle={{ backgroundColor: '#161920', border: '1px solid #1e2028', color: '#d4d4d8' }} />
             <Legend />
-            <Bar dataKey="value" fill="#2563eb" onClick={handleDataPointClick} cursor="pointer">
+            <Bar dataKey="value" fill="#ff5c5c" onClick={handleDataPointClick} cursor="pointer">
               {chartData.map((_entry: any, index: number) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
@@ -94,12 +90,12 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
       return (
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" fontSize={12} />
-            <YAxis fontSize={12} />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e2028" />
+            <XAxis dataKey="name" fontSize={12} stroke="#8e8e93" />
+            <YAxis fontSize={12} stroke="#8e8e93" />
+            <Tooltip contentStyle={{ backgroundColor: '#161920', border: '1px solid #1e2028', color: '#d4d4d8' }} />
             <Legend />
-            <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} />
+            <Line type="monotone" dataKey="value" stroke="#ff5c5c" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>
       );
@@ -109,12 +105,12 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
     return (
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" fontSize={12} />
-          <YAxis fontSize={12} />
-          <Tooltip />
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e2028" />
+          <XAxis dataKey="name" fontSize={12} stroke="#8e8e93" />
+          <YAxis fontSize={12} stroke="#8e8e93" />
+          <Tooltip contentStyle={{ backgroundColor: '#161920', border: '1px solid #1e2028', color: '#d4d4d8' }} />
           <Legend />
-          <Bar dataKey="value" fill="#2563eb" stackId="a" />
+          <Bar dataKey="value" fill="#ff5c5c" stackId="a" />
           {chartData[0]?.count !== undefined && <Bar dataKey="count" fill="#10b981" stackId="a" />}
         </BarChart>
       </ResponsiveContainer>
@@ -122,31 +118,16 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      }}
-    >
-      <h3 style={{ marginBottom: '0.5rem', fontSize: '1.125rem', fontWeight: 600 }}>{title}</h3>
-      <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: '1rem' }}>{description}</p>
+    <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+      <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
+      <p className="text-slate-400 text-sm mb-4">{description}</p>
 
       {loading && (
-        <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>Loading...</div>
+        <div className="text-center py-8 text-slate-400">Loading...</div>
       )}
 
       {error && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '2rem',
-            color: '#ef4444',
-            backgroundColor: '#fee',
-            borderRadius: '4px',
-          }}
-        >
+        <div className="text-center py-8 text-red-400 bg-red-900/20 rounded">
           Error: {error.message}
         </div>
       )}
@@ -154,7 +135,7 @@ function AnalyticsCard({ title, description, queryType, params, chartType }: Ana
       {!loading && !error && renderChart()}
 
       {!loading && !error && data && (
-        <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#666' }}>
+        <div className="mt-4 text-xs text-slate-500">
           {data.data.length} result{data.data.length !== 1 ? 's' : ''}
           {data.metadata.fromTs && data.metadata.toTs && (
             <> • {new Date(data.metadata.fromTs).toLocaleDateString()} - {new Date(data.metadata.toTs).toLocaleDateString()}</>
@@ -173,21 +154,15 @@ function Analytics() {
 
   return (
     <div>
-      <h2 style={{ marginBottom: '0.5rem' }}>Cross-Session Analytics</h2>
-      <p style={{ color: '#666', marginBottom: '1.5rem' }}>
+      <h2 className="text-2xl font-bold text-white mb-2">Cross-Session Analytics</h2>
+      <p className="text-slate-400 mb-6">
         Answer investigative questions that cut across sessions: cost patterns, tool failures,
         retry clustering, and more.
       </p>
 
       <QueryBuilder onParamsChange={setParams} defaultTimeRange="week" />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
-          gap: '1.5rem',
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(500px,1fr))] gap-6">
         {/* Query 1: Cost by Agent + Model */}
         <AnalyticsCard
           title="Cost by Agent + Model"
@@ -195,6 +170,7 @@ function Analytics() {
           queryType="cost_by_agent_model"
           params={params}
           chartType="bar"
+          valueField="totalCost"
         />
 
         {/* Query 2: Cost per Successful Task */}
@@ -204,6 +180,7 @@ function Analytics() {
           queryType="cost_per_successful_task"
           params={params}
           chartType="bar"
+          valueField="costPerTask"
         />
 
         {/* Query 3: Tool Failure Rate */}
@@ -213,6 +190,7 @@ function Analytics() {
           queryType="tool_failure_rate"
           params={params}
           chartType="bar"
+          valueField="failureRate"
         />
 
         {/* Query 4: Retry Clustering */}
@@ -222,6 +200,7 @@ function Analytics() {
           queryType="retry_clustering"
           params={params}
           chartType="bar"
+          valueField="retryCount"
         />
 
         {/* Query 5: Latency Percentiles */}
@@ -231,6 +210,8 @@ function Analytics() {
           queryType="latency_percentiles"
           params={params}
           chartType="stacked"
+          valueField="p90"
+          secondaryValueField="count"
         />
 
         {/* Query 6: Session Duration Distribution */}
@@ -240,6 +221,7 @@ function Analytics() {
           queryType="session_duration_distribution"
           params={params}
           chartType="bar"
+          valueField="count"
         />
 
         {/* Query 7: Error Hotspots by Channel */}
@@ -249,6 +231,7 @@ function Analytics() {
           queryType="error_hotspots_by_channel"
           params={params}
           chartType="bar"
+          valueField="errorRate"
         />
 
         {/* Query 8: Token Waste */}
@@ -258,6 +241,7 @@ function Analytics() {
           queryType="token_waste"
           params={params}
           chartType="bar"
+          valueField="rereadTokens"
         />
       </div>
     </div>

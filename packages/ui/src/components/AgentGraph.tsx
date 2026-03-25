@@ -4,9 +4,19 @@
  * Force-directed graph using D3.js showing agent delegation network.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as d3 from 'd3';
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  select,
+  zoom as d3Zoom,
+  drag as d3Drag,
+  type SimulationNodeDatum,
+} from 'd3';
 import type { TopologyNode, TopologyEdge } from '../api/client';
 
 export interface AgentGraphProps {
@@ -17,9 +27,7 @@ export interface AgentGraphProps {
   onEdgeClick?: (source: string, target: string) => void;
 }
 
-interface D3Node extends TopologyNode {
-  x?: number;
-  y?: number;
+interface D3Node extends TopologyNode, SimulationNodeDatum {
   fx?: number | null;
   fy?: number | null;
 }
@@ -32,15 +40,29 @@ interface D3Link {
 }
 
 function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGraphProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const navigate = useNavigate();
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  // Track container size with ResizeObserver
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const obs = new ResizeObserver(([entry]) => {
+      setDimensions({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!svgRef.current || nodes.length === 0) return;
+    if (!svgRef.current || nodes.length === 0 || dimensions.width === 0 || dimensions.height === 0) return;
 
-    const svg = d3.select(svgRef.current);
-    const width = svgRef.current.clientWidth;
-    const height = svgRef.current.clientHeight;
+    const svg = select(svgRef.current);
+    const { width, height } = dimensions;
 
     // Clear previous render
     svg.selectAll('*').remove();
@@ -49,13 +71,13 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
     const g = svg.append('g');
 
     // Add zoom behavior
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
+    const zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
 
-    svg.call(zoom as any);
+    svg.call(zoomBehavior as any);
 
     // Prepare data
     const d3Nodes: D3Node[] = nodes.map((n) => ({ ...n }));
@@ -66,14 +88,20 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
       status: e.status,
     }));
 
+    // Helper to compute node radius (capped)
+    const nodeRadius = (d: D3Node) => {
+      const size = sizeBy === 'cost' ? d.totalCost : d.spanCount;
+      return Math.min(10 + Math.sqrt(size) * 2, 40);
+    };
+
     // Create force simulation
-    const simulation = d3.forceSimulation(d3Nodes)
-      .force('link', d3.forceLink<D3Node, D3Link>(d3Links)
+    const simulation = forceSimulation(d3Nodes)
+      .force('link', forceLink<D3Node, D3Link>(d3Links)
         .id((d) => d.id)
         .distance(150))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(50));
+      .force('charge', forceManyBody().strength(-800))
+      .force('center', forceCenter(width / 2, height / 2))
+      .force('collision', forceCollide<D3Node>().radius((d) => nodeRadius(d) + 10));
 
     // Draw edges
     const link = g.append('g')
@@ -85,7 +113,7 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
           case 'ok': return '#10b981';
           case 'mixed': return '#f59e0b';
           case 'error': return '#ef4444';
-          default: return '#999';
+          default: return '#5a5a5e';
         }
       })
       .attr('stroke-width', (d) => Math.min(2 + Math.log(d.count), 10))
@@ -105,7 +133,7 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
       .data(d3Links)
       .join('text')
       .attr('font-size', 10)
-      .attr('fill', '#666')
+      .attr('fill', '#8e8e93')
       .attr('text-anchor', 'middle')
       .text((d) => d.count > 1 ? `${d.count}` : '');
 
@@ -114,17 +142,14 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
       .selectAll('circle')
       .data(d3Nodes)
       .join('circle')
-      .attr('r', (d) => {
-        const size = sizeBy === 'cost' ? d.totalCost : d.spanCount;
-        return 10 + Math.sqrt(size) * 2;
-      })
+      .attr('r', (d) => nodeRadius(d))
       .attr('fill', (d) => {
         const errorRate = d.spanCount > 0 ? d.errorCount / d.spanCount : 0;
         if (errorRate > 0.3) return '#ef4444'; // Red for high errors
         if (errorRate > 0.1) return '#f59e0b'; // Yellow for some errors
-        return '#2563eb'; // Blue for healthy
+        return '#ff5c5c'; // Accent red for healthy
       })
-      .attr('stroke', '#fff')
+      .attr('stroke', '#f4f4f5')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
       .on('click', (_event, d) => {
@@ -135,7 +160,7 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
           navigate(`/sessions?agentId=${encodeURIComponent(d.id)}`);
         }
       })
-      .call(d3.drag<SVGCircleElement, D3Node>()
+      .call(d3Drag<SVGCircleElement, D3Node>()
         .on('start', (event, d) => {
           if (!event.active) simulation.alphaTarget(0.3).restart();
           d.fx = d.x;
@@ -158,7 +183,7 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
       .join('text')
       .attr('font-size', 12)
       .attr('font-weight', 'bold')
-      .attr('fill', '#333')
+      .attr('fill', '#f4f4f5')
       .attr('text-anchor', 'middle')
       .attr('dy', -20)
       .text((d) => d.label)
@@ -170,7 +195,7 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
       .data(d3Nodes)
       .join('text')
       .attr('font-size', 10)
-      .attr('fill', '#666')
+      .attr('fill', '#8e8e93')
       .attr('text-anchor', 'middle')
       .attr('dy', -8)
       .text((d) => {
@@ -211,35 +236,27 @@ function AgentGraph({ nodes, edges, sizeBy, onNodeClick, onEdgeClick }: AgentGra
     return () => {
       simulation.stop();
     };
-  }, [nodes, edges, sizeBy, onNodeClick, onEdgeClick, navigate]);
+  }, [nodes, edges, sizeBy, dimensions, onNodeClick, onEdgeClick, navigate]);
 
   if (nodes.length === 0) {
     return (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#999',
-        }}
-      >
+      <div className="w-full h-full flex items-center justify-center text-slate-500">
         No topology data available
       </div>
     );
   }
 
   return (
-    <svg
-      ref={svgRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#f9fafb',
-        borderRadius: '8px',
-      }}
-    />
+    <div
+      ref={containerRef}
+      style={{ position: 'absolute', inset: 0, backgroundColor: '#161920', borderRadius: '8px' }}
+    >
+      <svg
+        ref={svgRef}
+        width={dimensions.width}
+        height={dimensions.height}
+      />
+    </div>
   );
 }
 

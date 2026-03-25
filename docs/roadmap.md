@@ -68,6 +68,42 @@ Pre-built analytics queries:
 
 ---
 
+## V1.1 — Dashboard & UX Improvements
+
+### Status: ✅ Complete (March 2026)
+
+#### ✅ Bots Dashboard
+
+- [x] Per-agent cards with live status (Working, Online, Idle, Offline)
+- [x] Session & message counts, tool calls, LLM calls per agent
+- [x] Token usage (input/output) with 7-day sparkline charts
+- [x] Cost & error rate with color-coded indicators
+- [x] Average response time with trend arrows and sparklines
+- [x] Delegation relationships (delegates to/from) with success rates
+- [x] Model & channel info per agent
+- [x] Date range filtering (24h, 7d, 30d, All)
+- [x] OpenClaw config reader for agent metadata (emoji, name, model)
+
+#### ✅ Session List Improvements
+
+- [x] Added Tokens In, Tokens Out, Tools, Errors columns
+- [x] Removed empty Channel and Cost columns
+- [x] Fixed session click navigation (was showing blank screen)
+- [x] Sortable columns with ascending/descending toggle
+
+#### ✅ Session Replay Fixes
+
+- [x] Connected to real API data (was using mock data)
+- [x] Fixed URL routing with React Router basename
+
+#### ✅ Agent Topology → Bots Integration
+
+- [x] Delegation data merged into agent cards on Bots dashboard
+- [x] Standalone topology page preserved but removed from primary nav
+- [x] Force-directed graph still accessible at `/clawlens/topology`
+
+---
+
 ## V2 — Community-Driven Enhancements
 
 V2 features will be prioritized based on **real user feedback** and **adoption metrics**. The features below are candidates, not commitments.

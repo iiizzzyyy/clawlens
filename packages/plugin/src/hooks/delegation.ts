@@ -60,7 +60,7 @@ export function onSubagentSpawned(
   const now = Date.now();
   const timestamp = ctx.timestamp ?? now;
 
-  writer.startSpan({
+  const spanId = writer.startSpan({
     traceId: parentSessionId,
     parentId: parentSpanId,
     sessionId: parentSessionId,
@@ -79,7 +79,10 @@ export function onSubagentSpawned(
     },
   });
 
-  // Note: We could track delegation spans for linking, but for V1 we'll keep it simple
+  // Track the delegation span so onSubagentEnded can close it
+  if (ctx.childSessionId) {
+    spanContext.trackDelegation(ctx.childSessionId, spanId);
+  }
 }
 
 /**
@@ -90,18 +93,24 @@ export function onSubagentSpawned(
 export function onSubagentEnded(
   _event: unknown,
   ctx: SubagentEndedContext,
-  _writer: SpanWriter,
-  _spanContext: SpanContext
+  writer: SpanWriter,
+  spanContext: SpanContext
 ): void {
-  const parentSessionId = ctx.parentSessionId;
-  if (!parentSessionId) {
+  if (!ctx.parentSessionId || !ctx.childSessionId) {
     return;
   }
 
-  // Finding the right delegation span to close is tricky without tracking
-  // For V1, we'll document this as a limitation and rely on JSONL import
-  // for complete delegation tracking
+  const spanId = spanContext.getDelegationSpan(ctx.childSessionId);
+  if (!spanId) {
+    return;
+  }
 
-  // In a full implementation, we'd track delegation span IDs from onSubagentSpawned
-  // and match them here by childSessionId
+  const now = Date.now();
+  writer.endSpan(spanId, {
+    endTs: ctx.timestamp ?? now,
+    status: ctx.success === false ? 'error' : 'ok',
+    errorMessage: ctx.error ?? null,
+  });
+
+  spanContext.clearDelegation(ctx.childSessionId);
 }

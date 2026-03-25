@@ -31,13 +31,34 @@ export interface ImportResult {
 
 /**
  * Session metadata from first JSONL line
+ * Supports both demo fixture format and real OpenClaw format
  */
 interface SessionMetadata {
   type: 'session';
+  /** Normalized session ID (from `sessionId` or `id`) */
   sessionId: string;
+  /** Normalized agent ID (from `agentId` or derived from file path) */
   agentId: string;
   channel?: string;
+  /** Normalized creation timestamp (from `createdAt` or `timestamp`) */
   createdAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Raw session line as it appears in JSONL files
+ * Real OpenClaw files use `id` and `timestamp`; demo fixtures use `sessionId` and `createdAt`
+ */
+interface RawSessionLine {
+  type: 'session';
+  id?: string;
+  sessionId?: string;
+  agentId?: string;
+  channel?: string;
+  timestamp?: string;
+  createdAt?: string;
+  version?: number;
+  cwd?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -67,6 +88,9 @@ interface AssistantMessage {
     usage?: {
       inputTokens?: number;
       outputTokens?: number;
+      input?: number;
+      output?: number;
+      totalTokens?: number;
       cost?: {
         input?: number;
         output?: number;
@@ -94,7 +118,29 @@ interface ToolResultMessage {
   };
 }
 
-type JSONLLine = SessionMetadata | UserMessage | AssistantMessage | ToolResultMessage;
+type JSONLLine = RawSessionLine | UserMessage | AssistantMessage | ToolResultMessage | { type: string };
+
+/**
+ * Derive agent ID from file path (e.g. agents/scout/sessions/abc.jsonl → scout)
+ */
+function deriveAgentIdFromPath(filePath: string): string {
+  const match = filePath.match(/agents\/([^/]+)\/sessions\//);
+  return match?.[1] ?? 'unknown';
+}
+
+/**
+ * Normalize a raw session line into a consistent SessionMetadata shape
+ */
+function normalizeSessionMetadata(raw: RawSessionLine, filePath: string): SessionMetadata {
+  return {
+    type: 'session',
+    sessionId: raw.sessionId ?? raw.id ?? randomUUID(),
+    agentId: raw.agentId ?? deriveAgentIdFromPath(filePath),
+    channel: raw.channel,
+    createdAt: raw.createdAt ?? raw.timestamp,
+    metadata: raw.metadata,
+  };
+}
 
 /**
  * Compute file hash for import tracking
@@ -254,7 +300,7 @@ async function parseSessionFile(filePath: string, result: ImportResult): Promise
 
       // First line should be session metadata
       if (lineNumber === 1 && parsed.type === 'session') {
-        sessionMetadata = parsed as SessionMetadata;
+        sessionMetadata = normalizeSessionMetadata(parsed as RawSessionLine, filePath);
         result.sessionId = sessionMetadata.sessionId;
 
         // Create session span
@@ -300,6 +346,11 @@ async function parseSessionFile(filePath: string, result: ImportResult): Promise
       if (!sessionMetadata) {
         result.errors.push(`Line ${lineNumber}: Message before session metadata`);
         result.linesFailed++;
+        continue;
+      }
+
+      // Skip non-message types (model_change, thinking_level_change, custom, etc.)
+      if (parsed.type !== 'message') {
         continue;
       }
 
@@ -369,8 +420,8 @@ async function parseSessionFile(filePath: string, result: ImportResult): Promise
             startTs: currentTurnStartTs ?? timestamp,
             endTs: timestamp,
             durationMs: currentTurnStartTs ? timestamp - currentTurnStartTs : null,
-            tokensIn: assistantMsg.message.usage?.inputTokens ?? 0,
-            tokensOut: assistantMsg.message.usage?.outputTokens ?? 0,
+            tokensIn: assistantMsg.message.usage?.inputTokens ?? assistantMsg.message.usage?.input ?? 0,
+            tokensOut: assistantMsg.message.usage?.outputTokens ?? assistantMsg.message.usage?.output ?? 0,
             costUsd: assistantMsg.message.usage?.cost?.total ?? 0,
             costInputUsd: assistantMsg.message.usage?.cost?.input ?? 0,
             costOutputUsd: assistantMsg.message.usage?.cost?.output ?? 0,

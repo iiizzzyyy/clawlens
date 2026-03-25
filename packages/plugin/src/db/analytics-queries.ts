@@ -255,7 +255,7 @@ export function retryClustering(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): RetryClusteringResult[] {
-  const conditions = buildTimeConditions(params);
+  const conditions = buildTimeConditions(params, 'te');
 
   const query = `
     WITH tool_sequences AS (
@@ -465,7 +465,7 @@ export function tokenWaste(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): TokenWasteResult[] {
-  const conditions = buildTimeConditions(params);
+  const conditions = buildTimeConditions(params, 's');
 
   const query = `
     WITH session_tokens AS (

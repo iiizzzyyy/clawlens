@@ -11,6 +11,8 @@ import type { SpanReader } from '../db/reader.js';
 import { handleSessionsList, handleSessionReplay, handleSessionSummary } from './sessions.js';
 import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
 import { handleTopology } from './topology.js';
+import { handleBots } from './bots.js';
+import type { OpenClawConfigReader } from '../config/openclaw-config.js';
 
 /**
  * HTTP route configuration (matches OpenClaw plugin SDK)
@@ -97,9 +99,36 @@ function getUrlPath(url: string | undefined): string {
 export function createRouteHandlers(
   reader: SpanReader,
   uiDistPath: string,
-  logger: Logger
+  logger: Logger,
+  configReader?: OpenClawConfigReader
 ): HttpRouteConfig[] {
   return [
+    // API: Bots overview
+    ...(configReader
+      ? [
+          {
+            path: '/clawlens/api/bots',
+            auth: 'gateway' as const,
+            match: 'exact' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              try {
+                const result = handleBots(req.url || '', reader, configReader);
+                if (result.error) {
+                  sendJson(res, result, 400);
+                } else {
+                  sendJson(res, result);
+                }
+                return true;
+              } catch (error) {
+                logger.error('[clawlens] Error in bots:', error);
+                sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+                return true;
+              }
+            },
+          },
+        ]
+      : []),
+
     // API: List sessions
     {
       path: '/clawlens/api/sessions',
@@ -293,9 +322,10 @@ export function registerRoutes(
   registerHttpRoute: (config: PluginRouteConfig) => void,
   reader: SpanReader,
   uiDistPath: string,
-  logger: Logger
+  logger: Logger,
+  configReader?: OpenClawConfigReader
 ): void {
-  const routes = createRouteHandlers(reader, uiDistPath, logger);
+  const routes = createRouteHandlers(reader, uiDistPath, logger, configReader);
 
   for (const route of routes) {
     // Cast handler to satisfy plugin API signature

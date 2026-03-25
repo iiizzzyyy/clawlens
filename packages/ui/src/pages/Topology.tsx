@@ -82,29 +82,18 @@ function Topology() {
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ marginBottom: '0.5rem' }}>Agent Topology & Flow</h2>
-        <p style={{ color: '#666', marginBottom: '1rem' }}>
+    <div className="h-full flex flex-col">
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold text-white mb-2">Agent Topology & Flow</h2>
+        <p className="text-slate-400 mb-4">
           Visualize multi-agent runtime behavior: nodes represent agents, edges show delegations.
         </p>
 
         {/* Controls */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            padding: '1rem',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="flex gap-4 p-4 bg-slate-800 rounded-lg mb-4 items-center flex-wrap border border-slate-700">
           {/* Time Range */}
-          <div style={{ minWidth: '150px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+          <div className="min-w-[150px]">
+            <label className="block text-sm text-slate-300 mb-2">
               Time Range
             </label>
             <select
@@ -114,12 +103,7 @@ function Topology() {
                 setCurrentTimestamp(null);
                 setIsPlaying(false);
               }}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #ddd',
-              }}
+              className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             >
               <option value="day">Last 24 hours</option>
               <option value="week">Last 7 days</option>
@@ -129,19 +113,14 @@ function Topology() {
           </div>
 
           {/* Size By */}
-          <div style={{ minWidth: '150px' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+          <div className="min-w-[150px]">
+            <label className="block text-sm text-slate-300 mb-2">
               Node Size
             </label>
             <select
               value={sizeBy}
               onChange={(e) => setSizeBy(e.target.value as 'cost' | 'spans')}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                borderRadius: '4px',
-                border: '1px solid #ddd',
-              }}
+              className="w-full p-2 rounded bg-slate-900 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500"
             >
               <option value="cost">By Cost</option>
               <option value="spans">By Span Count</option>
@@ -150,18 +129,12 @@ function Topology() {
 
           {/* Play/Pause Button */}
           {timeRange !== 'all' && (
-            <div style={{ marginLeft: 'auto' }}>
+            <div className="ml-auto">
               <button
                 onClick={handlePlayPause}
-                style={{
-                  padding: '0.5rem 1.5rem',
-                  backgroundColor: isPlaying ? '#ef4444' : '#2563eb',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
+                className={`px-6 py-2 text-white rounded font-medium cursor-pointer transition-colors ${
+                  isPlaying ? 'bg-red-500 hover:bg-red-600' : 'bg-accent-500 hover:bg-accent-600'
+                }`}
               >
                 {isPlaying ? 'Pause' : 'Play Timeline'}
               </button>
@@ -170,70 +143,34 @@ function Topology() {
         </div>
 
         {/* Legend */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '2rem',
-            padding: '0.75rem 1rem',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            marginBottom: '1rem',
-            fontSize: '0.875rem',
-          }}
-        >
-          <div>
-            <strong>Node Colors:</strong>
-            <span style={{ marginLeft: '0.5rem', color: '#2563eb' }}>● Healthy</span>
-            <span style={{ marginLeft: '0.5rem', color: '#f59e0b' }}>● Some Errors</span>
-            <span style={{ marginLeft: '0.5rem', color: '#ef4444' }}>● High Errors</span>
+        <div className="flex gap-8 px-4 py-3 bg-slate-800 rounded-lg mb-4 text-sm border border-slate-700">
+          <div className="text-slate-300">
+            <strong className="text-white">Node Colors:</strong>
+            <span className="ml-2 text-accent-500">● Healthy</span>
+            <span className="ml-2 text-amber-500">● Some Errors</span>
+            <span className="ml-2 text-red-500">● High Errors</span>
           </div>
-          <div>
-            <strong>Edge Colors:</strong>
-            <span style={{ marginLeft: '0.5rem', color: '#10b981' }}>━ OK</span>
-            <span style={{ marginLeft: '0.5rem', color: '#f59e0b' }}>━ Mixed</span>
-            <span style={{ marginLeft: '0.5rem', color: '#ef4444' }}>━ Errors</span>
+          <div className="text-slate-300">
+            <strong className="text-white">Edge Colors:</strong>
+            <span className="ml-2 text-emerald-500">━ OK</span>
+            <span className="ml-2 text-amber-500">━ Mixed</span>
+            <span className="ml-2 text-red-500">━ Errors</span>
           </div>
         </div>
       </div>
 
       {/* Graph Container */}
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          padding: '1rem',
-          position: 'relative',
-          minHeight: '500px',
-        }}
-      >
+      <div className="flex-1 bg-slate-800 rounded-lg relative min-h-[500px] border border-slate-700">
         {loading && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              color: '#666',
-            }}
-          >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400">
             Loading topology...
           </div>
         )}
 
         {error && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              color: '#ef4444',
-              textAlign: 'center',
-            }}
-          >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-red-400 text-center">
             <p>Error loading topology</p>
-            <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>{error.message}</p>
+            <p className="text-sm mt-2">{error.message}</p>
           </div>
         )}
 
@@ -249,19 +186,7 @@ function Topology() {
 
             {/* Current timestamp indicator */}
             {currentTimestamp && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                }}
-              >
+              <div className="absolute top-4 right-4 px-4 py-2 bg-slate-700/90 rounded text-sm font-medium text-slate-200">
                 {new Date(currentTimestamp).toLocaleString()}
               </div>
             )}
@@ -271,37 +196,23 @@ function Topology() {
 
       {/* Detail Panel */}
       {(selectedNode || selectedEdge) && (
-        <div
-          style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-          }}
-        >
+        <div className="mt-4 p-4 bg-slate-800 rounded-lg border border-slate-700">
           {selectedNode && topology && (
             <div>
-              <h3 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>
+              <h3 className="mb-2 text-base font-semibold text-white">
                 Agent: {selectedNode}
               </h3>
               {(() => {
                 const node = topology.nodes.find((n) => n.id === selectedNode);
                 if (node) {
                   return (
-                    <div style={{ fontSize: '0.875rem', color: '#666' }}>
+                    <div className="text-sm text-slate-400">
                       <p>Total Cost: ${node.totalCost.toFixed(2)}</p>
                       <p>Span Count: {node.spanCount}</p>
                       <p>Error Count: {node.errorCount}</p>
                       <button
                         onClick={() => setSelectedNode(null)}
-                        style={{
-                          marginTop: '0.5rem',
-                          padding: '0.25rem 0.75rem',
-                          backgroundColor: '#f3f4f6',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
+                        className="mt-2 px-3 py-1 bg-slate-700 border border-slate-600 rounded cursor-pointer text-slate-300 hover:bg-slate-600 transition-colors"
                       >
                         Close
                       </button>
@@ -315,7 +226,7 @@ function Topology() {
 
           {selectedEdge && topology && (
             <div>
-              <h3 style={{ marginBottom: '0.5rem', fontSize: '1rem' }}>
+              <h3 className="mb-2 text-base font-semibold text-white">
                 Delegation: {selectedEdge.source} → {selectedEdge.target}
               </h3>
               {(() => {
@@ -324,19 +235,12 @@ function Topology() {
                 );
                 if (edge) {
                   return (
-                    <div style={{ fontSize: '0.875rem', color: '#666' }}>
+                    <div className="text-sm text-slate-400">
                       <p>Delegation Count: {edge.count}</p>
                       <p>Status: {edge.status}</p>
                       <button
                         onClick={() => setSelectedEdge(null)}
-                        style={{
-                          marginTop: '0.5rem',
-                          padding: '0.25rem 0.75rem',
-                          backgroundColor: '#f3f4f6',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
+                        className="mt-2 px-3 py-1 bg-slate-700 border border-slate-600 rounded cursor-pointer text-slate-300 hover:bg-slate-600 transition-colors"
                       >
                         Close
                       </button>
