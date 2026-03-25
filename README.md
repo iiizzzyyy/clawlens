@@ -37,21 +37,34 @@ cd clawlens
 # 2. Install dependencies
 pnpm install
 
-# 3. Build the plugin and UI
+# 3. Build and deploy (automatically finds Node 22, rebuilds native modules)
+pnpm deploy:openclaw
+```
+
+The deploy script handles building, copying to the extensions directory, installing production dependencies, and rebuilding `better-sqlite3` for Node 22 — regardless of which Node version is active in your shell.
+
+<details>
+<summary>Manual installation (if you prefer)</summary>
+
+```bash
+# Build the plugin and UI
 pnpm build
 
-# 4. Copy to OpenClaw extensions directory
+# Copy to OpenClaw extensions directory
 mkdir -p ~/.openclaw/extensions/clawlens
 cp -r packages/plugin/dist/* ~/.openclaw/extensions/clawlens/dist/
 cp packages/plugin/package.json ~/.openclaw/extensions/clawlens/
 cp packages/plugin/openclaw.plugin.json ~/.openclaw/extensions/clawlens/
 
-# 5. Install runtime dependencies in the extensions directory
+# Install runtime dependencies (MUST use Node 22)
 cd ~/.openclaw/extensions/clawlens && npm install --production
 
-# 6. Rebuild native modules for OpenClaw's Node version
+# Rebuild native modules for OpenClaw's Node 22
 npm rebuild better-sqlite3
 ```
+
+**Important:** Steps 5-6 must run under Node 22. If your shell has a different Node version active, use `nvm use 22` first or specify the Node 22 path explicitly.
+</details>
 
 ### Configure OpenClaw
 

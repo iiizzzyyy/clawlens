@@ -20,7 +20,8 @@
     "dev:ui": "pnpm --filter @clawlens/ui dev",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "lint": "eslint .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "deploy:openclaw": "bash scripts/deploy.sh"
   },
   "keywords": [
     "openclaw",
