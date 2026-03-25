@@ -113,6 +113,7 @@ At-a-glance overview of all your agents. Each agent card shows:
 - **Delegation relationships** — Which agents delegate to/from each other, with success rates
 - **Model & channel info** — What model each agent uses, which channels it operates on
 - **Date range filtering** — Filter stats by 24h, 7d, 30d, or all time
+- **Click to explore** — Click any agent card to jump to its sessions, pre-filtered by agent and time period
 
 ### 🔍 **Session Replay**
 

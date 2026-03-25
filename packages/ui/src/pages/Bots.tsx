@@ -4,7 +4,8 @@
  * Displays agent cards with stats, sparklines, and live status.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBots } from '../hooks/useBots';
 import type { BotFilters } from '../hooks/useBots';
 import AgentCard from '../components/AgentCard';
@@ -31,6 +32,7 @@ function formatTime(date: Date | null): string {
 }
 
 export default function Bots() {
+  const navigate = useNavigate();
   const [pollInterval, setPollInterval] = useState<number | null>(null);
   const [period, setPeriod] = useState<PeriodKey>('all');
 
@@ -42,6 +44,14 @@ export default function Bots() {
   }, [period]);
 
   const { bots, loading, error, refetch, lastUpdated } = useBots(pollInterval, filters);
+
+  const handleAgentClick = useCallback((agentId: string) => {
+    const params = new URLSearchParams();
+    params.set('agentId', agentId);
+    if (filters?.fromTs) params.set('fromTs', String(filters.fromTs));
+    if (filters?.toTs) params.set('toTs', String(filters.toTs));
+    navigate(`/?${params.toString()}`);
+  }, [navigate, filters]);
 
   return (
     <div>
@@ -118,7 +128,7 @@ export default function Bots() {
       {bots.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {bots.map((bot) => (
-            <AgentCard key={bot.id} bot={bot} />
+            <AgentCard key={bot.id} bot={bot} onClick={() => handleAgentClick(bot.id)} />
           ))}
         </div>
       )}

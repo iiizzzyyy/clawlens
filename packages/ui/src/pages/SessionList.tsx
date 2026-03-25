@@ -5,21 +5,32 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSessions } from '../hooks/useSession';
 import type { SessionSummary, SessionListFilters, SpanStatus } from '../api/client';
 
 type SortField = keyof SessionSummary;
 type SortDirection = 'asc' | 'desc';
 
+function tsToDatetimeLocal(ts: string | null): string {
+  if (!ts) return '';
+  const n = Number(ts);
+  if (isNaN(n)) return '';
+  const d = new Date(n);
+  // Format as YYYY-MM-DDTHH:mm for datetime-local input
+  const pad = (v: number) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function SessionList() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Filters
-  const [agentId, setAgentId] = useState('');
+  // Filters — initialize from URL search params if present
+  const [agentId, setAgentId] = useState(searchParams.get('agentId') || '');
   const [status, setStatus] = useState<SpanStatus | ''>('');
-  const [fromTs, setFromTs] = useState('');
-  const [toTs, setToTs] = useState('');
+  const [fromTs, setFromTs] = useState(tsToDatetimeLocal(searchParams.get('fromTs')));
+  const [toTs, setToTs] = useState(tsToDatetimeLocal(searchParams.get('toTs')));
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>('startTs');

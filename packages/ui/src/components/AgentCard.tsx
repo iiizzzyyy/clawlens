@@ -8,6 +8,7 @@ import Sparkline from './Sparkline';
 
 interface AgentCardProps {
   bot: BotInfo;
+  onClick?: () => void;
 }
 
 const STATUS_CONFIG = {
@@ -74,12 +75,18 @@ function getTrendArrow(sparkline: number[]): { arrow: string; color: string } | 
   return { arrow: '\u2192', color: 'text-slate-400' };
 }
 
-export default function AgentCard({ bot }: AgentCardProps) {
+export default function AgentCard({ bot, onClick }: AgentCardProps) {
   const statusCfg = STATUS_CONFIG[bot.status];
   const responseTrend = getTrendArrow(bot.responseSparkline);
 
   return (
-    <div className="bg-slate-800 rounded-lg p-5 border border-slate-700 flex flex-col gap-4">
+    <div
+      className={`bg-slate-800 rounded-lg p-5 border border-slate-700 flex flex-col gap-4${onClick ? ' cursor-pointer hover:border-slate-500 transition-colors' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+    >
       {/* Header: Name + Status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

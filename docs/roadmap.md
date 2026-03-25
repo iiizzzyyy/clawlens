@@ -82,6 +82,7 @@ Pre-built analytics queries:
 - [x] Delegation relationships (delegates to/from) with success rates
 - [x] Model & channel info per agent
 - [x] Date range filtering (24h, 7d, 30d, All)
+- [x] Click agent card to navigate to filtered sessions (agent + time period)
 - [x] OpenClaw config reader for agent metadata (emoji, name, model)
 
 #### ✅ Session List Improvements
