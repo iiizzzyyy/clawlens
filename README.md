@@ -110,6 +110,15 @@ Step through any agent conversation turn-by-turn with full cost, token, tool exe
 - Running cost accumulator with per-turn cost bar
 - Drill into any LLM call or tool execution via span detail panel
 - Keyboard navigation (arrow keys, Enter to expand, Esc to close)
+- **Export & Share** — Download any session as self-contained HTML or JSON (see below)
+
+### 📤 **Export & Share**
+
+Export any session replay for sharing in bug reports, Notion docs, or GitHub issues:
+
+- **HTML export** — Self-contained, interactive HTML file (dark theme, collapsible turns, no server needed)
+- **JSON export** — Raw session span tree for scripting and automation
+- Export button in the Replay page header
 
 ### 📋 **Session List**
 
@@ -204,6 +213,7 @@ ClawLens exposes a REST API at `/clawlens/api/`:
 | `GET /clawlens/api/sessions` | Session list (supports filtering and pagination) |
 | `GET /clawlens/api/sessions/:id/replay` | Full session span tree for replay |
 | `GET /clawlens/api/sessions/:id/summary` | Session summary stats |
+| `GET /clawlens/api/sessions/:id/export` | Export session as HTML or JSON (`?format=html\|json`) |
 | `GET /clawlens/api/analytics/:queryType` | Analytics queries (15+ query types) |
 | `GET /clawlens/api/analytics` | List available query types |
 

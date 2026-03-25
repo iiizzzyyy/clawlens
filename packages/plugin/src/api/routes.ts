@@ -9,6 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import type { SpanReader } from '../db/reader.js';
 import { handleSessionsList, handleSessionReplay, handleSessionSummary } from './sessions.js';
+import { handleSessionExport } from './export.js';
 import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
 import { handleTopology } from './topology.js';
 import { handleBots } from './bots.js';
@@ -160,7 +161,7 @@ export function createRouteHandlers(
         try {
           const path = getUrlPath(req.url);
 
-          // Route to replay or summary based on path
+          // Route to replay, summary, or export based on path
           if (path.endsWith('/replay')) {
             const result = handleSessionReplay(req.url || '', reader);
             if (result.error) {
@@ -177,6 +178,8 @@ export function createRouteHandlers(
             } else {
               sendJson(res, result);
             }
+          } else if (path.endsWith('/export')) {
+            handleSessionExport(req.url || '', res, reader);
           } else {
             sendError(res, 'NOT_FOUND', 'Endpoint not found', 404);
           }

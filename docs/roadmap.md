@@ -102,6 +102,14 @@ Pre-built analytics queries:
 - [x] Standalone topology page preserved but removed from primary nav
 - [x] Force-directed graph still accessible at `/clawlens/topology`
 
+#### ✅ Export & Share (Partial)
+
+- [x] Self-contained HTML export (no server needed)
+- [x] JSON export (machine-readable)
+- [x] Export button in Replay page header
+- [ ] PDF export with full timeline (future)
+- [ ] Redact sensitive data before sharing (future)
+
 ---
 
 ## V2 — Community-Driven Enhancements
@@ -293,22 +301,20 @@ clawlens:
 
 ---
 
-### 📤 Export & Share
+### 📤 Export & Share (Remaining)
 
-**Trigger**: Bug reporting workflows
+**Status**: Partially shipped in V1.1 (HTML + JSON export). Remaining items below.
 
-**Description**: Export session replay as shareable HTML or PDF.
+**Trigger**: Bug reporting workflows needing PDF or redaction
 
-**Features**:
-- Self-contained HTML export (no server needed)
+**Remaining Features**:
 - PDF export with full timeline
 - Redact sensitive data before sharing
-- Embed in Notion/Confluence/GitHub issues
 
-**Formats**:
-- HTML (interactive, standalone)
-- PDF (static, printable)
-- JSON (machine-readable)
+**Already Shipped** (V1.1):
+- ~~Self-contained HTML export (no server needed)~~
+- ~~JSON export (machine-readable)~~
+- ~~Export button in Replay page~~
 
 **Effort**: Small (1-2 weeks)
 

@@ -5,14 +5,63 @@
  * tool execution, and timing annotations.
  */
 
+import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useSessionReplay } from '../hooks/useSession';
 import { getMockSessionReplay } from '../mocks/session-replay';
+import { getSessionExportUrl } from '../api/client';
 import CostBar from '../components/CostBar';
 import Timeline from '../components/Timeline';
 
 // Use mock data in development when API is not available
 const USE_MOCK_DATA = false;
+
+function ExportMenu({ sessionId }: { sessionId: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg border border-slate-600 transition-colors flex items-center gap-1.5"
+      >
+        Export
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="opacity-60">
+          <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 min-w-[160px]">
+          <a
+            href={getSessionExportUrl(sessionId, 'html')}
+            download
+            className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-t-lg"
+            onClick={() => setOpen(false)}
+          >
+            Download HTML
+          </a>
+          <a
+            href={getSessionExportUrl(sessionId, 'json')}
+            download
+            className="block px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 rounded-b-lg"
+            onClick={() => setOpen(false)}
+          >
+            Download JSON
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Replay() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -139,6 +188,8 @@ export default function Replay() {
               </span>
             </div>
           </div>
+          {/* Export dropdown */}
+          {sessionId && <ExportMenu sessionId={sessionId} />}
           {/* Mock data indicator */}
           {USE_MOCK_DATA && mockData && (
             <div className="px-3 py-1 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-400 text-sm">

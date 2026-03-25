@@ -304,3 +304,13 @@ export async function fetchTopology(params?: {
   const path = `/topology${queryString ? `?${queryString}` : ''}`;
   return fetchApi<TopologyGraph>(path);
 }
+
+/**
+ * Get the URL for exporting a session as HTML or JSON
+ */
+export function getSessionExportUrl(
+  sessionId: string,
+  format: 'html' | 'json'
+): string {
+  return `${API_BASE}/sessions/${sessionId}/export?format=${format}`;
+}
