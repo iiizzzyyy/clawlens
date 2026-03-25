@@ -11,6 +11,12 @@
 
 ClawLens is an **investigation and debugging tool** for OpenClaw — purpose-built to answer "why did my agent do that?" rather than just "what happened?" It captures every session, turn, LLM call, and tool execution, then lets you **monitor agent health at a glance**, **replay conversations turn-by-turn**, and **query patterns across sessions**. Unlike monitoring dashboards that show metrics, ClawLens shows you the _why_ behind cost spikes, failures, and unexpected behavior.
 
+![Bots Dashboard](docs/screenshots/bots-dashboard.png)
+*At-a-glance overview of all your agents with live status, token sparklines, and delegation relationships*
+
+![Session Replay](docs/screenshots/session-replay.png)
+*Step through any conversation turn-by-turn with cost, token, and timing annotations*
+
 ---
 
 ## Installation
