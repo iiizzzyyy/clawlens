@@ -15,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { path: '/bots', label: 'Bots', icon: '🤖' },
+    { path: '/cron', label: 'Scheduled', icon: '⏰' },
     { path: '/', label: 'Sessions', icon: '📋' },
     { path: '/analytics', label: 'Analytics', icon: '📊' },
   ];

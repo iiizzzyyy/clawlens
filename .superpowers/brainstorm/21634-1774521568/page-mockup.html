@@ -1,0 +1,202 @@
+<h2>Scheduled Jobs Page &mdash; Full Mockup</h2>
+<p class="subtitle">This is what the page would look like with all sections</p>
+
+<div class="mockup">
+  <div class="mockup-header">ClawLens &mdash; /clawlens/cron</div>
+  <div class="mockup-body" style="padding:16px;background:#0f172a;">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div>
+        <div style="font-size:20px;font-weight:700;color:#e2e8f0;">Scheduled Jobs</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px;">60 jobs &middot; 47 active</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;border:1px solid #475569;border-radius:6px;overflow:hidden;">
+          <span style="padding:4px 8px;font-size:11px;color:#94a3b8;background:#334155;">Manual</span>
+          <span style="padding:4px 8px;font-size:11px;color:#fff;background:#2563eb;">30s</span>
+          <span style="padding:4px 8px;font-size:11px;color:#94a3b8;background:#334155;">1m</span>
+        </div>
+        <button style="padding:4px 12px;font-size:12px;color:#e2e8f0;background:#334155;border:1px solid #475569;border-radius:6px;cursor:pointer;">Refresh</button>
+      </div>
+    </div>
+
+    <!-- Summary Strip -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center;">
+        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Active Jobs</div>
+        <div style="font-size:28px;font-weight:700;color:#e2e8f0;margin:4px 0;">47</div>
+        <div style="font-size:11px;color:#64748b;">of 60 total &middot; 13 disabled</div>
+      </div>
+      <div style="background:#1e293b;border:1px solid #991b1b;border-radius:8px;padding:14px;text-align:center;">
+        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Failing</div>
+        <div style="font-size:28px;font-weight:700;color:#fca5a5;margin:4px 0;">3</div>
+        <div style="font-size:11px;color:#fca5a5;">consecutive errors</div>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center;">
+        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Next Run</div>
+        <div style="font-size:20px;font-weight:700;color:#e2e8f0;margin:4px 0;">12 min</div>
+        <div style="font-size:11px;color:#64748b;">Task Tracker Check-in</div>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center;">
+        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Est. Daily Cost</div>
+        <div style="font-size:28px;font-weight:700;color:#e2e8f0;margin:4px 0;">$2.84</div>
+        <div style="font-size:11px;color:#64748b;">avg across all active jobs</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;">
+      <input type="text" placeholder="Search jobs..." style="background:#1e293b;border:1px solid #475569;border-radius:6px;padding:6px 10px;font-size:12px;color:#e2e8f0;width:200px;">
+      <select style="background:#1e293b;border:1px solid #475569;border-radius:6px;padding:6px 10px;font-size:12px;color:#e2e8f0;">
+        <option>All agents</option>
+        <option>main</option>
+        <option>scout</option>
+        <option>writer</option>
+        <option>ops</option>
+      </select>
+      <select style="background:#1e293b;border:1px solid #475569;border-radius:6px;padding:6px 10px;font-size:12px;color:#e2e8f0;">
+        <option>All statuses</option>
+        <option>OK</option>
+        <option>Failing</option>
+        <option>Disabled</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;overflow:hidden;">
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#334155;color:#94a3b8;">
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Job &darr;</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Agent</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Schedule</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Last Run</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Duration</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Cost</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">Status</th>
+            <th style="padding:10px 12px;text-align:left;font-weight:500;">History</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Healthy row -->
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;cursor:pointer;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <td style="padding:10px 12px;font-weight:500;">Berlin Rental Tracker</td>
+            <td style="padding:10px 12px;color:#64748b;">scout</td>
+            <td style="padding:10px 12px;color:#64748b;">daily at 5:00 AM</td>
+            <td style="padding:10px 12px;color:#94a3b8;">3h ago</td>
+            <td style="padding:10px 12px;color:#94a3b8;">33s</td>
+            <td style="padding:10px 12px;color:#94a3b8;">$0.04</td>
+            <td style="padding:10px 12px;"><span style="background:#064e3b;color:#86efac;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;">OK</span></td>
+            <td style="padding:10px 12px;letter-spacing:2px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;</span></td>
+          </tr>
+          <!-- Failing row with red tint -->
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;background:rgba(127,29,29,0.15);cursor:pointer;" onmouseover="this.style.background='rgba(127,29,29,0.25)'" onmouseout="this.style.background='rgba(127,29,29,0.15)'">
+            <td style="padding:10px 12px;font-weight:500;">Evening Reflection Prompt</td>
+            <td style="padding:10px 12px;color:#64748b;">main</td>
+            <td style="padding:10px 12px;color:#64748b;">daily at 9:00 PM</td>
+            <td style="padding:10px 12px;color:#94a3b8;">12h ago</td>
+            <td style="padding:10px 12px;color:#94a3b8;">--</td>
+            <td style="padding:10px 12px;color:#94a3b8;">$0.12</td>
+            <td style="padding:10px 12px;"><span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;">ERR &times;2</span></td>
+            <td style="padding:10px 12px;letter-spacing:2px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;&#9679;</span><span style="color:#86efac;">&#9679;&#9679;</span></td>
+          </tr>
+          <!-- Healthy row -->
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;cursor:pointer;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <td style="padding:10px 12px;font-weight:500;">Follow-up CoPilot Daily</td>
+            <td style="padding:10px 12px;color:#64748b;">main</td>
+            <td style="padding:10px 12px;color:#64748b;">daily at 10:00 AM</td>
+            <td style="padding:10px 12px;color:#94a3b8;">1h ago</td>
+            <td style="padding:10px 12px;color:#94a3b8;">45s</td>
+            <td style="padding:10px 12px;color:#94a3b8;">$0.08</td>
+            <td style="padding:10px 12px;"><span style="background:#064e3b;color:#86efac;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;">OK</span></td>
+            <td style="padding:10px 12px;letter-spacing:2px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span></td>
+          </tr>
+          <!-- Disabled row -->
+          <tr style="border-bottom:1px solid #0f172a;color:#64748b;cursor:pointer;opacity:0.6;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <td style="padding:10px 12px;font-weight:500;">Weekly Memory Extraction</td>
+            <td style="padding:10px 12px;">main</td>
+            <td style="padding:10px 12px;">Sun at 10:00 AM</td>
+            <td style="padding:10px 12px;">5d ago</td>
+            <td style="padding:10px 12px;">2m 10s</td>
+            <td style="padding:10px 12px;">$0.34</td>
+            <td style="padding:10px 12px;"><span style="background:#1e293b;color:#64748b;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;">OFF</span></td>
+            <td style="padding:10px 12px;letter-spacing:2px;"><span style="color:#64748b;">&#9679;&#9679;&#9679;&#9679;&#9679;</span></td>
+          </tr>
+          <!-- Healthy row -->
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;cursor:pointer;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <td style="padding:10px 12px;font-weight:500;">Morning Data Briefing</td>
+            <td style="padding:10px 12px;color:#64748b;">scout</td>
+            <td style="padding:10px 12px;color:#64748b;">daily at 7:30 AM</td>
+            <td style="padding:10px 12px;color:#94a3b8;">5h ago</td>
+            <td style="padding:10px 12px;color:#94a3b8;">28s</td>
+            <td style="padding:10px 12px;color:#94a3b8;">$0.06</td>
+            <td style="padding:10px 12px;"><span style="background:#064e3b;color:#86efac;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;">OK</span></td>
+            <td style="padding:10px 12px;letter-spacing:2px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="background:#334155;padding:8px 12px;font-size:11px;color:#94a3b8;">
+        Showing 5 of 60 jobs
+      </div>
+    </div>
+
+    <!-- Expanded row detail (shown when you click a row) -->
+    <div style="margin-top:16px;background:#1e293b;border:1px solid #475569;border-radius:8px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#e2e8f0;">Evening Reflection Prompt &mdash; Run History</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">main &middot; 0 21 * * * &middot; Telegram announce &middot; <span style="color:#fca5a5;">2 consecutive errors</span></div>
+        </div>
+        <div style="font-size:11px;color:#64748b;">Last error: cron: job execution timed out</div>
+      </div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse;">
+        <thead>
+          <tr style="color:#64748b;border-bottom:1px solid #334155;">
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">When</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">Status</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">Duration</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">Cost</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">Summary</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500;">Replay</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #0f172a;color:#fca5a5;">
+            <td style="padding:6px 8px;">Today 9:00 PM</td>
+            <td style="padding:6px 8px;"><span style="background:#7f1d1d;padding:1px 6px;border-radius:3px;font-size:9px;">error</span></td>
+            <td style="padding:6px 8px;">--</td>
+            <td style="padding:6px 8px;">$0.00</td>
+            <td style="padding:6px 8px;color:#94a3b8;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">cron: job execution timed out</td>
+            <td style="padding:6px 8px;color:#64748b;">--</td>
+          </tr>
+          <tr style="border-bottom:1px solid #0f172a;color:#fca5a5;">
+            <td style="padding:6px 8px;">Yesterday 9:00 PM</td>
+            <td style="padding:6px 8px;"><span style="background:#7f1d1d;padding:1px 6px;border-radius:3px;font-size:9px;">error</span></td>
+            <td style="padding:6px 8px;">--</td>
+            <td style="padding:6px 8px;">$0.00</td>
+            <td style="padding:6px 8px;color:#94a3b8;">cron: job execution timed out</td>
+            <td style="padding:6px 8px;color:#64748b;">--</td>
+          </tr>
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;">
+            <td style="padding:6px 8px;">Mar 24, 9:00 PM</td>
+            <td style="padding:6px 8px;"><span style="background:#064e3b;color:#86efac;padding:1px 6px;border-radius:3px;font-size:9px;">ok</span></td>
+            <td style="padding:6px 8px;color:#94a3b8;">1m 12s</td>
+            <td style="padding:6px 8px;color:#94a3b8;">$0.12</td>
+            <td style="padding:6px 8px;color:#94a3b8;">Generated evening reflection on focus and productivity...</td>
+            <td style="padding:6px 8px;"><a style="color:#60a5fa;text-decoration:none;font-size:10px;" href="#">View &rarr;</a></td>
+          </tr>
+          <tr style="border-bottom:1px solid #0f172a;color:#e2e8f0;">
+            <td style="padding:6px 8px;">Mar 23, 9:00 PM</td>
+            <td style="padding:6px 8px;"><span style="background:#064e3b;color:#86efac;padding:1px 6px;border-radius:3px;font-size:9px;">ok</span></td>
+            <td style="padding:6px 8px;color:#94a3b8;">58s</td>
+            <td style="padding:6px 8px;color:#94a3b8;">$0.09</td>
+            <td style="padding:6px 8px;color:#94a3b8;">Reflected on day's accomplishments and tomorrow's goals...</td>
+            <td style="padding:6px 8px;"><a style="color:#60a5fa;text-decoration:none;font-size:10px;" href="#">View &rarr;</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>

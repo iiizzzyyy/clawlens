@@ -1,0 +1,146 @@
+<h2>Scheduled Jobs: Page Layout Approach</h2>
+<p class="subtitle">How should the cron dashboard be structured? Pick the layout that fits your mental model.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Card Grid (like Bots page)</h3>
+      <p>Each cron job gets a card with status indicator, next/last run, sparkline of recent runs, cost, and error count. Click a card to see full run history. Consistent with the existing Bots dashboard pattern.</p>
+      <div class="mockup" style="margin-top:12px;">
+        <div class="mockup-body" style="padding:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:600;color:#e2e8f0;">Berlin Rental Tracker</span>
+                <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;"></span><span style="font-size:11px;color:#94a3b8;">OK</span></span>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:6px;">0 5 * * * &middot; scout &middot; Every day 5am</div>
+              <div style="display:flex;gap:16px;font-size:12px;color:#94a3b8;margin-bottom:8px;">
+                <span>Last: 3h ago</span>
+                <span>Next: 21h</span>
+                <span>$0.04/run</span>
+              </div>
+              <div style="height:24px;background:linear-gradient(90deg,#064e3b 0%,#064e3b 85%,#7f1d1d 85%,#7f1d1d 100%);border-radius:4px;overflow:hidden;display:flex;">
+                <div style="display:flex;align-items:center;gap:2px;padding:0 6px;">
+                  <span style="font-size:9px;color:#86efac;">&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;&#9608;</span>
+                  <span style="font-size:9px;color:#fca5a5;">&#9608;</span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:600;color:#e2e8f0;">Evening Reflection</span>
+                <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#eab308;"></span><span style="font-size:11px;color:#94a3b8;">2 errors</span></span>
+              </div>
+              <div style="font-size:11px;color:#64748b;margin-bottom:6px;">0 21 * * * &middot; main &middot; Every day 9pm</div>
+              <div style="display:flex;gap:16px;font-size:12px;color:#94a3b8;margin-bottom:8px;">
+                <span>Last: 12h ago</span>
+                <span>Next: 12h</span>
+                <span>$0.12/run</span>
+              </div>
+              <div style="height:24px;background:linear-gradient(90deg,#064e3b 0%,#064e3b 60%,#7f1d1d 60%,#7f1d1d 100%);border-radius:4px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Consistent with Bots page pattern</li><li>Great at-a-glance health overview</li><li>Scales well with 60 jobs</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less detail visible per job</li><li>Need to click through for run history</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Timeline Table (like Sessions page)</h3>
+      <p>A sortable table where each row is a cron job, with columns for status, schedule, last run, next run, avg cost, error rate, and a mini run-history bar. Click a row to expand run history inline or navigate to detail view.</p>
+      <div class="mockup" style="margin-top:12px;">
+        <div class="mockup-body" style="padding:0;">
+          <table style="width:100%;font-size:12px;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#334155;color:#94a3b8;">
+                <th style="padding:8px;text-align:left;">Job</th>
+                <th style="padding:8px;text-align:left;">Agent</th>
+                <th style="padding:8px;text-align:left;">Schedule</th>
+                <th style="padding:8px;text-align:left;">Last Run</th>
+                <th style="padding:8px;text-align:left;">Next</th>
+                <th style="padding:8px;text-align:left;">Avg Cost</th>
+                <th style="padding:8px;text-align:left;">Status</th>
+                <th style="padding:8px;text-align:left;">Last 7 runs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #1e293b;color:#e2e8f0;">
+                <td style="padding:8px;">Berlin Rental Tracker</td>
+                <td style="padding:8px;color:#64748b;">scout</td>
+                <td style="padding:8px;font-family:monospace;color:#64748b;">0 5 * * *</td>
+                <td style="padding:8px;color:#94a3b8;">3h ago</td>
+                <td style="padding:8px;color:#94a3b8;">21h</td>
+                <td style="padding:8px;color:#94a3b8;">$0.04</td>
+                <td style="padding:8px;"><span style="background:#064e3b;color:#86efac;padding:2px 6px;border-radius:4px;font-size:10px;">OK</span></td>
+                <td style="padding:8px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;</span></td>
+              </tr>
+              <tr style="border-bottom:1px solid #1e293b;color:#e2e8f0;">
+                <td style="padding:8px;">Evening Reflection</td>
+                <td style="padding:8px;color:#64748b;">main</td>
+                <td style="padding:8px;font-family:monospace;color:#64748b;">0 21 * * *</td>
+                <td style="padding:8px;color:#94a3b8;">12h ago</td>
+                <td style="padding:8px;color:#94a3b8;">12h</td>
+                <td style="padding:8px;color:#94a3b8;">$0.12</td>
+                <td style="padding:8px;"><span style="background:#7f1d1d;color:#fca5a5;padding:2px 6px;border-radius:4px;font-size:10px;">ERR</span></td>
+                <td style="padding:8px;"><span style="color:#86efac;">&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;&#9679;</span><span style="color:#86efac;">&#9679;&#9679;</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Dense info — see all 60 jobs at once</li><li>Sortable (by error rate, cost, next run)</li><li>Consistent with Sessions page</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less visual impact than cards</li><li>Harder to spot patterns at a glance</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Summary Strip + Table</h3>
+      <p>Top section: 3-4 summary cards (total jobs, failing now, next up, total daily cost). Below: the sortable table from option B. Best of both — glanceable health + dense data. Click any row to drill into run history with full session replay link.</p>
+      <div class="mockup" style="margin-top:12px;">
+        <div class="mockup-body" style="padding:12px;">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Active Jobs</div>
+              <div style="font-size:24px;font-weight:700;color:#e2e8f0;">47</div>
+              <div style="font-size:10px;color:#64748b;">of 60 total</div>
+            </div>
+            <div style="background:#1e293b;border:1px solid #991b1b;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Failing</div>
+              <div style="font-size:24px;font-weight:700;color:#fca5a5;">3</div>
+              <div style="font-size:10px;color:#fca5a5;">consecutive errors</div>
+            </div>
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Next Run</div>
+              <div style="font-size:16px;font-weight:700;color:#e2e8f0;">12 min</div>
+              <div style="font-size:10px;color:#64748b;">Task Tracker Check-in</div>
+            </div>
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px;text-align:center;">
+              <div style="font-size:11px;color:#64748b;">Daily Cost</div>
+              <div style="font-size:24px;font-weight:700;color:#e2e8f0;">$2.84</div>
+              <div style="font-size:10px;color:#64748b;">across all jobs</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;border-bottom:1px solid #334155;padding-bottom:4px;margin-bottom:4px;">Job &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Agent &nbsp;&nbsp;&nbsp; Schedule &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Last Run &nbsp; Cost &nbsp; Status &nbsp; History</div>
+          <div style="font-size:12px;color:#94a3b8;padding:6px 0;border-bottom:1px solid #1e293b;">Berlin Rental Tracker &nbsp; scout &nbsp;&nbsp;&nbsp; 0 5 * * * &nbsp;&nbsp;&nbsp; 3h ago &nbsp;&nbsp; $0.04 &nbsp; <span style="color:#86efac;">OK</span> &nbsp;&nbsp;&nbsp;&nbsp; <span style="color:#86efac;">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;</span></div>
+          <div style="font-size:12px;color:#94a3b8;padding:6px 0;">Evening Reflection &nbsp;&nbsp;&nbsp;&nbsp; main &nbsp;&nbsp;&nbsp;&nbsp; 0 21 * * * &nbsp;&nbsp; 12h ago &nbsp; $0.12 &nbsp; <span style="color:#fca5a5;">ERR</span> &nbsp;&nbsp; <span style="color:#86efac;">&#9679;&#9679;&#9679;</span><span style="color:#fca5a5;">&#9679;&#9679;</span><span style="color:#86efac;">&#9679;&#9679;</span></div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>At-a-glance health via summary strip</li><li>Dense sortable table for exploration</li><li>Drill-down to session replay</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More to build (two sections)</li><li>Summary strip needs real-time data</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

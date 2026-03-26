@@ -40,6 +40,7 @@ import { importDirectory } from './importers/jsonl.js';
 import { loadConfig, expandPath, type ClawLensConfig } from './config.js';
 import { initializeDemoIfNeeded } from './demo.js';
 import { OpenClawConfigReader } from './config/openclaw-config.js';
+import { syncCronRuns } from './cron/cron-reader.js';
 
 /**
  * Get the UI dist path (relative to this file when bundled)
@@ -63,10 +64,12 @@ const pluginState: {
   writer: SpanWriter | null;
   reader: SpanReader | null;
   config: ClawLensConfig | null;
+  cronSyncInterval: ReturnType<typeof setInterval> | null;
 } = {
   writer: null,
   reader: null,
   config: null,
+  cronSyncInterval: null,
 };
 
 /**
@@ -120,8 +123,24 @@ function register(api: PluginAPI): void {
       reader,
       uiDistPath,
       logger,
-      configReader
+      configReader,
+      db
     );
+
+    // Sync cron run data from JSONL files into SQLite
+    try {
+      syncCronRuns(db, logger);
+    } catch (error) {
+      logger.warn('[clawlens] Initial cron sync failed:', error);
+    }
+    // Periodic re-sync every 60s
+    pluginState.cronSyncInterval = setInterval(() => {
+      try {
+        syncCronRuns(db, logger);
+      } catch (error) {
+        logger.warn('[clawlens] Periodic cron sync failed:', error);
+      }
+    }, 60_000);
 
     // Initialize demo mode if needed (or run backfill)
     initializeDemoMode(reader, writer, config, logger).catch((error) => {
@@ -209,6 +228,10 @@ export default register;
  */
 export function shutdown(): void {
   try {
+    if (pluginState.cronSyncInterval) {
+      clearInterval(pluginState.cronSyncInterval);
+      pluginState.cronSyncInterval = null;
+    }
     closeDb();
     pluginState.writer = null;
     pluginState.reader = null;

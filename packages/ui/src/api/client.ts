@@ -314,3 +314,91 @@ export function getSessionExportUrl(
 ): string {
   return `${API_BASE}/sessions/${sessionId}/export?format=${format}`;
 }
+
+// =============================================================================
+// Cron (Scheduled Jobs)
+// =============================================================================
+
+export interface CronSchedule {
+  kind: 'cron' | 'at' | 'every';
+  expr?: string;
+  tz?: string;
+  at?: string;
+  everyMs?: number;
+}
+
+export interface CronJobState {
+  lastRunAtMs?: number;
+  lastStatus?: string;
+  lastRunStatus?: string;
+  lastDurationMs?: number;
+  consecutiveErrors?: number;
+  nextRunAtMs?: number;
+  lastError?: string;
+}
+
+export interface RunDot {
+  ts: number;
+  status: string;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  agentId: string;
+  enabled: boolean;
+  schedule: CronSchedule;
+  payload: unknown;
+  state: CronJobState;
+  delivery?: Record<string, unknown>;
+  description?: string;
+  deleteAfterRun?: boolean;
+  createdAtMs?: number;
+  updatedAtMs?: number;
+  avgDurationMs: number | null;
+  lastRunCostUsd: number | null;
+  recentRuns: RunDot[];
+  totalRuns: number;
+  errorCount: number;
+}
+
+export interface CronRunEntry {
+  ts: number;
+  runAtMs: number | null;
+  status: string | null;
+  error: string | null;
+  durationMs: number | null;
+  model: string | null;
+  summary: string | null;
+  sessionId: string | null;
+  costUsd: number | null;
+}
+
+export interface CronSummary {
+  activeCount: number;
+  totalCount: number;
+  failingCount: number;
+  nextRunJobName: string | null;
+  nextRunAtMs: number | null;
+  estimatedDailyCostUsd: number | null;
+}
+
+export async function fetchCronJobs(): Promise<CronJob[]> {
+  return fetchApi<CronJob[]>('/cron/jobs');
+}
+
+export async function fetchCronJobRuns(
+  jobId: string,
+  limit = 20,
+  offset = 0
+): Promise<CronRunEntry[]> {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', limit.toString());
+  if (offset) params.set('offset', offset.toString());
+  const qs = params.toString();
+  return fetchApi<CronRunEntry[]>(`/cron/jobs/${encodeURIComponent(jobId)}/runs${qs ? `?${qs}` : ''}`);
+}
+
+export async function fetchCronSummary(): Promise<CronSummary> {
+  return fetchApi<CronSummary>('/cron/summary');
+}

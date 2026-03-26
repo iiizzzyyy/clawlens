@@ -7,12 +7,14 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import type Database from 'better-sqlite3';
 import type { SpanReader } from '../db/reader.js';
 import { handleSessionsList, handleSessionReplay, handleSessionSummary } from './sessions.js';
 import { handleSessionExport } from './export.js';
 import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
 import { handleTopology } from './topology.js';
 import { handleBots } from './bots.js';
+import { handleCronJobs, handleCronJobRuns, handleCronSummary } from './cron.js';
 import type { OpenClawConfigReader } from '../config/openclaw-config.js';
 
 /**
@@ -101,7 +103,8 @@ export function createRouteHandlers(
   reader: SpanReader,
   uiDistPath: string,
   logger: Logger,
-  configReader?: OpenClawConfigReader
+  configReader?: OpenClawConfigReader,
+  db?: Database.Database
 ): HttpRouteConfig[] {
   return [
     // API: Bots overview
@@ -248,6 +251,40 @@ export function createRouteHandlers(
       },
     },
 
+    // API: Cron jobs (scheduled workflows)
+    ...(db
+      ? [
+          {
+            path: '/clawlens/api/cron/summary',
+            auth: 'gateway' as const,
+            match: 'exact' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              handleCronSummary(req, res, db, logger);
+              return true;
+            },
+          },
+          {
+            path: '/clawlens/api/cron/jobs',
+            auth: 'gateway' as const,
+            match: 'prefix' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              const path = getUrlPath(req.url);
+              if (path.endsWith('/runs')) {
+                handleCronJobRuns(req, res, db, logger);
+              } else if (
+                path === '/clawlens/api/cron/jobs' ||
+                path === '/clawlens/api/cron/jobs/'
+              ) {
+                handleCronJobs(req, res, db, logger);
+              } else {
+                sendError(res, 'NOT_FOUND', 'Endpoint not found', 404);
+              }
+              return true;
+            },
+          },
+        ]
+      : []),
+
     // UI: Serve static files and SPA fallback
     {
       path: '/clawlens',
@@ -326,9 +363,10 @@ export function registerRoutes(
   reader: SpanReader,
   uiDistPath: string,
   logger: Logger,
-  configReader?: OpenClawConfigReader
+  configReader?: OpenClawConfigReader,
+  db?: Database.Database
 ): void {
-  const routes = createRouteHandlers(reader, uiDistPath, logger, configReader);
+  const routes = createRouteHandlers(reader, uiDistPath, logger, configReader, db);
 
   for (const route of routes) {
     // Cast handler to satisfy plugin API signature

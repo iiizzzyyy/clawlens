@@ -9,7 +9,7 @@ import type Database from 'better-sqlite3';
 /**
  * Current schema version - increment when making schema changes
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * DDL for spans table - the core data store
@@ -132,6 +132,38 @@ CREATE TABLE IF NOT EXISTS schema_version (
 `;
 
 /**
+ * DDL for cron_runs table — synced from JSONL run files
+ */
+export const CREATE_CRON_RUNS_TABLE = `
+CREATE TABLE IF NOT EXISTS cron_runs (
+  row_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id        TEXT    NOT NULL,
+  ts            INTEGER NOT NULL,
+  run_at_ms     INTEGER,
+  status        TEXT,
+  error         TEXT,
+  duration_ms   INTEGER,
+  model         TEXT,
+  provider      TEXT,
+  summary       TEXT,
+  session_id    TEXT,
+  session_key   TEXT,
+  delivered     INTEGER DEFAULT 0,
+  tokens_in     INTEGER,
+  tokens_out    INTEGER,
+  UNIQUE(job_id, ts)
+);
+`;
+
+/**
+ * DDL for cron_runs indexes
+ */
+export const CREATE_CRON_RUNS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_cron_runs_job_time ON cron_runs(job_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_cron_runs_status ON cron_runs(status) WHERE status = 'error';
+`;
+
+/**
  * All table creation statements in order
  */
 export const TABLE_DDL = [
@@ -139,12 +171,13 @@ export const TABLE_DDL = [
   CREATE_DAILY_STATS_TABLE,
   CREATE_IMPORTS_TABLE,
   CREATE_SCHEMA_VERSION_TABLE,
+  CREATE_CRON_RUNS_TABLE,
 ];
 
 /**
  * All index creation statements
  */
-export const INDEX_DDL = [CREATE_SPANS_INDEXES];
+export const INDEX_DDL = [CREATE_SPANS_INDEXES, CREATE_CRON_RUNS_INDEXES];
 
 /**
  * Get current schema version from database
