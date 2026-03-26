@@ -41,10 +41,18 @@ export function getDemoFixturesPath(): string {
   try {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    // From dist/demo.js -> dist/fixtures/demo/
-    return join(__dirname, 'fixtures', 'demo');
+    // Check multiple candidates:
+    // 1. dist/demo.js → dist/fixtures/demo/ (runtime)
+    // 2. src/demo.ts  → ../fixtures/demo/  (tests via vitest)
+    const candidates = [
+      join(__dirname, 'fixtures', 'demo'),
+      join(__dirname, '..', 'fixtures', 'demo'),
+    ];
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) return candidate;
+    }
+    return candidates[0];
   } catch {
-    // Fallback for environments where import.meta.url doesn't work
     return join(process.cwd(), 'fixtures', 'demo');
   }
 }
