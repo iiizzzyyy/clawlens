@@ -154,6 +154,17 @@ Answer investigative questions that cut across sessions:
 - **Token waste** — "How much am I spending on re-reading history?"
 - Time-range filtering on all queries
 
+### ⏰ **Scheduled Jobs Dashboard**
+
+Monitor all cron-triggered agent workflows in one place:
+
+- **Summary strip** — Active jobs, failing count, next run countdown, estimated daily cost
+- **Sortable job table** — Status badges, schedule, duration, cost, and history sparkline dots
+- **Expandable rows** — Job metadata and last 20 runs with session replay deep-links
+- **Filters** — Search by name, filter by agent, status (All / OK / Failing / Disabled)
+- **Auto-refresh** — Configurable polling (Manual, 30s, 1m, 5m)
+- Reads directly from OpenClaw cron JSONL run files — no extra configuration
+
 ---
 
 ## How It Works
@@ -175,6 +186,7 @@ ClawLens runs as an **OpenClaw plugin** inside the Gateway process. No separate 
  │       │  Query   ──▶ REST API      │           │
  │       │  Serve   ──▶ React UI      │           │
  │       │  Import  ◀── JSONL files   │           │
+ │       │  Cron   ◀── JSONL run logs │           │
  │       │  Config  ◀── openclaw.json │           │
  │       └────────────────────────────┘           │
  └────────────────────────────────────────────────┘
@@ -230,6 +242,9 @@ ClawLens exposes a REST API at `/clawlens/api/`:
 | `GET /clawlens/api/sessions/:id/export` | Export session as HTML or JSON (`?format=html\|json`) |
 | `GET /clawlens/api/analytics/:queryType` | Analytics queries (15+ query types) |
 | `GET /clawlens/api/analytics` | List available query types |
+| `GET /clawlens/api/cron/jobs` | Cron job list with run stats |
+| `GET /clawlens/api/cron/jobs/:id/runs` | Paginated run history for a job |
+| `GET /clawlens/api/cron/summary` | Aggregate cron summary |
 
 ---
 
@@ -260,6 +275,7 @@ clawlens/
 │   ├── plugin/          # OpenClaw plugin (backend)
 │   │   ├── src/
 │   │   │   ├── api/     # HTTP route handlers
+│   │   │   ├── cron/    # Cron job reader and queries
 │   │   │   ├── db/      # SQLite queries and schema
 │   │   │   ├── config/  # OpenClaw config reader
 │   │   │   ├── hooks/   # Lifecycle hook handlers
@@ -267,9 +283,10 @@ clawlens/
 │   │   └── package.json
 │   └── ui/              # React web UI (frontend)
 │       ├── src/
-│       │   ├── pages/   # Bots, SessionList, Replay, Analytics
+│       │   ├── pages/   # Bots, SessionList, Replay, Analytics, CronJobs
 │       │   ├── components/
 │       │   ├── hooks/
+│       │   ├── utils/   # Formatting utilities
 │       │   └── api/     # Typed API client
 │       └── package.json
 ├── docs/                # Documentation
@@ -311,6 +328,7 @@ OpenClaw has great OTEL metrics and ClawMetry for cost tracking, but when someth
 | Agent delegation tracking | ✅ | ❌ | ❌ | ❌ |
 | Works without OTEL enabled | ✅ | ❌ | ❌ | ✅ |
 | Historical backfill | ✅ | ❌ | ❌ | N/A |
+| Scheduled job monitoring | ✅ | ❌ | ❌ | ❌ |
 | Zero-config install | ✅ | ✅ | ❌ | N/A |
 
 ---

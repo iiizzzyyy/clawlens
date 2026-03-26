@@ -113,6 +113,28 @@ Pre-built analytics queries:
 
 ---
 
+## V1.2 — Scheduled Jobs & Polish
+
+### Status: ✅ Complete (March 2026)
+
+#### ✅ Scheduled Jobs Dashboard
+
+- [x] Summary strip (active jobs, failing, next run, estimated daily cost)
+- [x] Sortable table with status badges, history dots, duration, cost
+- [x] Row expansion with metadata and last 20 runs with replay links
+- [x] Cron JSONL reader with incremental sync to SQLite
+- [x] 3 new API endpoints (jobs, job runs, summary)
+- [x] Auto-refresh polling (Manual/30s/1m/5m)
+- [x] Status and agent filtering, name search
+
+#### ✅ Deploy Script Improvements
+
+- [x] `pnpm deploy:openclaw` auto-detects Node 22 via nvm/fnm/volta
+- [x] Rebuilds native modules for correct ABI version
+- [x] Copies built assets to extensions directory
+
+---
+
 ## V2 — Community-Driven Enhancements
 
 V2 features will be prioritized based on **real user feedback** and **adoption metrics**. The features below are candidates, not commitments.
@@ -384,6 +406,8 @@ These features have been considered and **will not** be added to ClawLens:
 ## Release Schedule
 
 - **V1**: ✅ Complete (beta released)
+- **V1.1**: ✅ Complete (March 2026)
+- **V1.2**: ✅ Complete (March 2026)
 - **V2.0**: Q2 2026 (first V2 feature based on feedback)
 - **V2.1+**: Every 6-8 weeks
 
