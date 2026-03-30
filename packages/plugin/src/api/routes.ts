@@ -9,7 +9,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import type Database from 'better-sqlite3';
 import type { SpanReader } from '../db/reader.js';
-import type { FlowBus } from '../events/flow-bus.js';
+import type { FlowBus, FlowEvent, FlowSpanType } from '../events/flow-bus.js';
+import type { Span, SpanType } from '../db/types.js';
 import { handleSessionsList, handleSessionReplay, handleSessionSummary } from './sessions.js';
 import { handleSessionExport } from './export.js';
 import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
@@ -73,6 +74,7 @@ const MIME_TYPES: Record<string, string> = {
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
+  '.map': 'application/json',
 };
 
 /**
@@ -106,6 +108,42 @@ function getUrlPath(url: string | undefined): string {
 }
 
 /**
+ * Map database span types to flow visualization span types
+ */
+const SPAN_TYPE_TO_FLOW: Record<SpanType, FlowSpanType> = {
+  session: 'session_start',
+  turn: 'message_received',
+  llm_call: 'llm_output',
+  tool_exec: 'after_tool_call',
+  memory_search: 'after_tool_call',
+  delegation: 'subagent_spawned',
+};
+
+/**
+ * Convert a database Span to a FlowEvent for the live flow visualization
+ */
+function spanToFlowEvent(span: Span): FlowEvent {
+  return {
+    type: 'span',
+    data: {
+      spanType: SPAN_TYPE_TO_FLOW[span.spanType] ?? 'message_received',
+      agentId: span.agentId,
+      name: span.name,
+      status: span.status === 'error' ? 'error' : 'ok',
+      timestamp: span.startTs,
+      metadata: span.metadata as Record<string, unknown> ?? {},
+      costUsd: span.costUsd,
+      tokensIn: span.tokensIn,
+      tokensOut: span.tokensOut,
+      durationMs: span.durationMs,
+      model: span.model,
+      sessionId: span.sessionId,
+      errorMessage: span.errorMessage,
+    },
+  };
+}
+
+/**
  * Create route handlers with access to SpanReader
  */
 export function createRouteHandlers(
@@ -117,64 +155,52 @@ export function createRouteHandlers(
   flowBus?: FlowBus
 ): HttpRouteConfig[] {
   return [
-    // API: Flow SSE stream
-    ...(flowBus
-      ? [
-          {
-            path: '/clawlens/api/flow/stream',
-            auth: 'gateway' as const,
-            match: 'exact' as const,
-            handler: async (req: IncomingMessage, res: ServerResponse) => {
-              try {
-                // Set SSE headers
-                res.writeHead(200, {
-                  'Content-Type': 'text/event-stream',
-                  'Cache-Control': 'no-cache',
-                  'Connection': 'keep-alive',
-                  'X-Accel-Buffering': 'no',
-                });
+    // API: Flow events (polling — gateway buffers responses, so SSE doesn't work)
+    {
+      path: '/clawlens/api/flow/events',
+      auth: 'gateway' as const,
+      match: 'exact' as const,
+      handler: async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          const queryStr = req.url?.split('?')[1] ?? '';
+          const params = new URLSearchParams(queryStr);
+          const since = parseInt(params.get('since') ?? '0', 10) || 0;
 
-                // Send recent events as initial state
-                const recentEvents = flowBus.getRecent(50);
-                for (const event of recentEvents) {
-                  res.write(`data: ${JSON.stringify(event)}\n\n`);
-                }
+          // Get events from in-memory flowBus (real-time hooks)
+          const busEvents = flowBus
+            ? flowBus.getRecent(100).filter((e) => e.data.timestamp > since)
+            : [];
 
-                // Subscribe to new events
-                const unsubscribe = flowBus.subscribe((event) => {
-                  try {
-                    res.write(`data: ${JSON.stringify(event)}\n\n`);
-                  } catch {
-                    // Client disconnected, cleanup will happen via 'close'
-                  }
-                });
+          // Also query recent spans from the database (JSONL-sourced data)
+          let dbEvents: FlowEvent[] = [];
+          try {
+            const dbSpans = reader.getRecentSpans(since, 100);
+            dbEvents = dbSpans.map(spanToFlowEvent);
+          } catch {
+            // DB may not be initialized yet on first request
+          }
 
-                // Keep-alive ping every 30s
-                const keepAlive = setInterval(() => {
-                  try {
-                    res.write(': keepalive\n\n');
-                  } catch {
-                    // Client disconnected
-                  }
-                }, 30_000);
+          // Merge: prefer bus events (real-time), supplement with DB events
+          // Use timestamp as dedup key — bus events are more current
+          const busTimestamps = new Set(busEvents.map((e) => e.data.timestamp));
+          const merged = [
+            ...busEvents,
+            ...dbEvents.filter((e) => !busTimestamps.has(e.data.timestamp)),
+          ];
 
-                // Cleanup on client disconnect
-                req.on('close', () => {
-                  unsubscribe();
-                  clearInterval(keepAlive);
-                });
+          // Sort chronologically and limit
+          merged.sort((a, b) => a.data.timestamp - b.data.timestamp);
+          const limited = merged.slice(-100);
 
-                // SSE connections stay open — don't end the response
-                return true;
-              } catch (error) {
-                logger.error('[clawlens] Error in flow stream:', error);
-                sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
-                return true;
-              }
-            },
-          },
-        ]
-      : []),
+          sendJson(res, { data: limited });
+          return true;
+        } catch (error) {
+          logger.error('[clawlens] Error in flow events:', error);
+          sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+          return true;
+        }
+      },
+    },
 
     // API: Log streaming (SSE)
     {
@@ -500,6 +526,13 @@ export function createRouteHandlers(
             const content = readFileSync(filePath);
             const mimeType = MIME_TYPES[ext] || 'application/octet-stream';
             res.setHeader('Content-Type', mimeType);
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            // Hashed assets are immutable; HTML/other files should revalidate
+            if (relativePath.startsWith('/assets/')) {
+              res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            } else {
+              res.setHeader('Cache-Control', 'no-cache');
+            }
             res.end(content);
             return true;
           }
@@ -509,6 +542,8 @@ export function createRouteHandlers(
           if (existsSync(indexPath)) {
             const content = readFileSync(indexPath);
             res.setHeader('Content-Type', 'text/html');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Access-Control-Allow-Origin', '*');
             res.end(content);
             return true;
           }
