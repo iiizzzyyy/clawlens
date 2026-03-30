@@ -6,9 +6,11 @@
 
 import type { SpanWriter } from '../db/writer.js';
 import { SpanContext } from './span-context.js';
+import type { FlowBus } from '../events/flow-bus.js';
 import {
   onSessionStart,
   onSessionEnd,
+  parseAgentIdFromSessionKey,
   type SessionStartContext,
   type SessionEndContext,
 } from './session.js';
@@ -84,7 +86,7 @@ export interface PluginAPI {
  * @param writer - SpanWriter instance for database operations
  * @returns SpanContext instance for span tracking
  */
-export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
+export function registerHooks(api: PluginAPI, writer: SpanWriter, flowBus?: FlowBus): SpanContext {
   const spanContext = new SpanContext();
 
   api.logger.info('[clawlens] Registering lifecycle hooks');
@@ -94,7 +96,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'session_start',
     (event, ctx) => {
       try {
-        onSessionStart(event, ctx as SessionStartContext, writer, spanContext);
+        const typedCtx = ctx as SessionStartContext;
+        onSessionStart(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'session_start',
+            agentId: parseAgentIdFromSessionKey(typedCtx.sessionKey ?? ''),
+            name: 'Session started',
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: { sessionId: typedCtx.sessionId },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in session_start hook:', error);
       }
@@ -106,7 +120,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'session_end',
     (event, ctx) => {
       try {
-        onSessionEnd(event, ctx as SessionEndContext, writer, spanContext);
+        const typedCtx = ctx as SessionEndContext;
+        onSessionEnd(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'session_end',
+            agentId: parseAgentIdFromSessionKey(typedCtx.sessionKey ?? ''),
+            name: 'Session ended',
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: { sessionId: typedCtx.sessionId },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in session_end hook:', error);
       }
@@ -119,7 +145,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'message_received',
     (event, ctx) => {
       try {
-        onMessageReceived(event, ctx as MessageReceivedContext, writer, spanContext);
+        const typedCtx = ctx as MessageReceivedContext;
+        onMessageReceived(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'message_received',
+            agentId: parseAgentIdFromSessionKey(typedCtx.context?.sessionKey ?? ''),
+            name: 'Message received',
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: { channel: typedCtx.context?.channelId },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in message_received hook:', error);
       }
@@ -131,7 +169,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'message_sent',
     (event, ctx) => {
       try {
-        onMessageSent(event, ctx as MessageSentContext, writer, spanContext);
+        const typedCtx = ctx as MessageSentContext;
+        onMessageSent(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'message_sent',
+            agentId: parseAgentIdFromSessionKey(typedCtx.context?.sessionKey ?? ''),
+            name: 'Message sent',
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: { channel: typedCtx.context?.channelId },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in message_sent hook:', error);
       }
@@ -144,7 +194,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'after_tool_call',
     (event, ctx) => {
       try {
-        onAfterToolCall(event, ctx as ToolCallContext, writer, spanContext);
+        const typedCtx = ctx as ToolCallContext;
+        onAfterToolCall(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'after_tool_call',
+            agentId: parseAgentIdFromSessionKey(typedCtx.sessionKey ?? ''),
+            name: `Tool: ${typedCtx.toolName ?? 'unknown'}`,
+            status: typedCtx.error ? 'error' : 'ok',
+            timestamp: Date.now(),
+            metadata: { toolName: typedCtx.toolName },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in after_tool_call hook:', error);
       }
@@ -169,7 +231,19 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
     'llm_output',
     (event, ctx) => {
       try {
-        onLlmOutput(event, ctx as LlmOutputContext, writer, spanContext);
+        const typedCtx = ctx as LlmOutputContext;
+        onLlmOutput(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'llm_output',
+            agentId: parseAgentIdFromSessionKey(typedCtx.sessionKey ?? ''),
+            name: `LLM: ${typedCtx.model ?? 'unknown'}`,
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: { model: typedCtx.model, tokensOut: typedCtx.usage?.outputTokens },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in llm_output hook:', error);
       }
@@ -188,6 +262,20 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter): SpanContext {
           childSessionId: typedCtx.childSessionId,
         });
         onSubagentSpawned(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'subagent_spawned',
+            agentId: typedCtx.targetAgentId ?? 'unknown',
+            name: `Subagent: ${typedCtx.targetAgentId ?? 'unknown'}`,
+            status: 'ok',
+            timestamp: Date.now(),
+            metadata: {
+              childSessionId: typedCtx.childSessionId,
+              targetAgentId: typedCtx.targetAgentId,
+            },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in subagent_spawned hook:', error);
       }

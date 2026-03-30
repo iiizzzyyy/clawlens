@@ -9,6 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import type Database from 'better-sqlite3';
 import type { SpanReader } from '../db/reader.js';
+import type { FlowBus } from '../events/flow-bus.js';
 import { handleSessionsList, handleSessionReplay, handleSessionSummary } from './sessions.js';
 import { handleSessionExport } from './export.js';
 import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
@@ -104,9 +105,69 @@ export function createRouteHandlers(
   uiDistPath: string,
   logger: Logger,
   configReader?: OpenClawConfigReader,
-  db?: Database.Database
+  db?: Database.Database,
+  flowBus?: FlowBus
 ): HttpRouteConfig[] {
   return [
+    // API: Flow SSE stream
+    ...(flowBus
+      ? [
+          {
+            path: '/clawlens/api/flow/stream',
+            auth: 'gateway' as const,
+            match: 'exact' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              try {
+                // Set SSE headers
+                res.writeHead(200, {
+                  'Content-Type': 'text/event-stream',
+                  'Cache-Control': 'no-cache',
+                  'Connection': 'keep-alive',
+                  'X-Accel-Buffering': 'no',
+                });
+
+                // Send recent events as initial state
+                const recentEvents = flowBus.getRecent(50);
+                for (const event of recentEvents) {
+                  res.write(`data: ${JSON.stringify(event)}\n\n`);
+                }
+
+                // Subscribe to new events
+                const unsubscribe = flowBus.subscribe((event) => {
+                  try {
+                    res.write(`data: ${JSON.stringify(event)}\n\n`);
+                  } catch {
+                    // Client disconnected, cleanup will happen via 'close'
+                  }
+                });
+
+                // Keep-alive ping every 30s
+                const keepAlive = setInterval(() => {
+                  try {
+                    res.write(': keepalive\n\n');
+                  } catch {
+                    // Client disconnected
+                  }
+                }, 30_000);
+
+                // Cleanup on client disconnect
+                req.on('close', () => {
+                  unsubscribe();
+                  clearInterval(keepAlive);
+                });
+
+                // SSE connections stay open — don't end the response
+                return true;
+              } catch (error) {
+                logger.error('[clawlens] Error in flow stream:', error);
+                sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+                return true;
+              }
+            },
+          },
+        ]
+      : []),
+
     // API: Bots overview
     ...(configReader
       ? [
@@ -364,9 +425,10 @@ export function registerRoutes(
   uiDistPath: string,
   logger: Logger,
   configReader?: OpenClawConfigReader,
-  db?: Database.Database
+  db?: Database.Database,
+  flowBus?: FlowBus
 ): void {
-  const routes = createRouteHandlers(reader, uiDistPath, logger, configReader, db);
+  const routes = createRouteHandlers(reader, uiDistPath, logger, configReader, db, flowBus);
 
   for (const route of routes) {
     // Cast handler to satisfy plugin API signature

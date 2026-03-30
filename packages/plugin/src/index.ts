@@ -41,6 +41,7 @@ import { loadConfig, expandPath, type ClawLensConfig } from './config.js';
 import { initializeDemoIfNeeded } from './demo.js';
 import { OpenClawConfigReader } from './config/openclaw-config.js';
 import { syncCronRuns } from './cron/cron-reader.js';
+import { FlowBus } from './events/flow-bus.js';
 
 /**
  * Get the UI dist path (relative to this file when bundled)
@@ -107,9 +108,12 @@ function register(api: PluginAPI): void {
     pluginState.writer = writer;
     pluginState.reader = reader;
 
+    // Create flow event bus for live visualization
+    const flowBus = new FlowBus(100);
+
     // Register lifecycle hooks
     logger.info('[clawlens] Registering lifecycle hooks');
-    registerHooks(api, writer);
+    registerHooks(api, writer, flowBus);
 
     // Initialize OpenClaw config reader for agent metadata
     const configReader = new OpenClawConfigReader(undefined, logger);
@@ -124,7 +128,8 @@ function register(api: PluginAPI): void {
       uiDistPath,
       logger,
       configReader,
-      db
+      db,
+      flowBus
     );
 
     // Sync cron run data from JSONL files into SQLite

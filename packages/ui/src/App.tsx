@@ -5,6 +5,7 @@ import CronJobs from './pages/CronJobs';
 import SessionList from './pages/SessionList';
 import Replay from './pages/Replay';
 import Analytics from './pages/Analytics';
+import Flow from './pages/Flow';
 // Topology page removed from nav — API still available at /clawlens/api/topology
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="/" element={<SessionList />} />
           <Route path="/replay/:sessionId" element={<Replay />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/flow" element={<Flow />} />
         </Routes>
       </Layout>
     </BrowserRouter>
