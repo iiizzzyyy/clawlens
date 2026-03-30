@@ -12,6 +12,7 @@ import { getMockSessionReplay } from '../mocks/session-replay';
 import { getSessionExportUrl } from '../api/client';
 import CostBar from '../components/CostBar';
 import Timeline from '../components/Timeline';
+import ChatTranscript from '../components/ChatTranscript';
 
 // Use mock data in development when API is not available
 const USE_MOCK_DATA = false;
@@ -161,6 +162,8 @@ export default function Replay() {
     );
   }
 
+  const [view, setView] = useState<'timeline' | 'chat'>('timeline');
+
   // Count turns and child spans
   const turnCount = sessionTree.children.filter((c) => c.spanType === 'turn').length;
   const totalSpans = sessionTree.children.reduce(
@@ -254,11 +257,39 @@ export default function Replay() {
         )}
       </div>
 
-      {/* Cost bar */}
-      <CostBar sessionTree={sessionTree} />
+      {/* View toggle */}
+      <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1 w-fit border border-slate-700">
+        <button
+          onClick={() => setView('timeline')}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            view === 'timeline'
+              ? 'bg-slate-600 text-white'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Timeline
+        </button>
+        <button
+          onClick={() => setView('chat')}
+          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            view === 'chat'
+              ? 'bg-slate-600 text-white'
+              : 'text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          Chat
+        </button>
+      </div>
 
-      {/* Timeline */}
-      <Timeline sessionTree={sessionTree} />
+      {/* Cost bar (timeline view only) */}
+      {view === 'timeline' && <CostBar sessionTree={sessionTree} />}
+
+      {/* Main content */}
+      {view === 'timeline' ? (
+        <Timeline sessionTree={sessionTree} />
+      ) : (
+        <ChatTranscript sessionTree={sessionTree} />
+      )}
     </div>
   );
 }
