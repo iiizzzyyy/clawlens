@@ -402,3 +402,61 @@ export async function fetchCronJobRuns(
 export async function fetchCronSummary(): Promise<CronSummary> {
   return fetchApi<CronSummary>('/cron/summary');
 }
+
+// =============================================================================
+// Memory (Workspace Files)
+// =============================================================================
+
+export interface MemoryFile {
+  path: string;
+  name: string;
+  size: number;
+  modifiedAt: number;
+}
+
+export interface MemoryFileContent {
+  path: string;
+  content: string;
+  modifiedAt: number;
+}
+
+export interface MemorySnapshotMeta {
+  id: number;
+  path: string;
+  contentHash: string;
+  capturedAt: number;
+}
+
+export interface MemoryDiffResult {
+  path: string;
+  from: number;
+  to: number;
+  diff: string;
+}
+
+export async function fetchMemoryFiles(): Promise<MemoryFile[]> {
+  return fetchApi<MemoryFile[]>('/memory/files');
+}
+
+export async function fetchMemoryFileContent(path: string): Promise<MemoryFileContent> {
+  const encoded = btoa(path);
+  return fetchApi<MemoryFileContent>(`/memory/files/${encodeURIComponent(encoded)}`);
+}
+
+export async function fetchMemoryHistory(path: string): Promise<MemorySnapshotMeta[]> {
+  const params = new URLSearchParams({ path });
+  return fetchApi<MemorySnapshotMeta[]>(`/memory/history?${params}`);
+}
+
+export async function fetchMemoryDiff(
+  path: string,
+  from: number,
+  to: number
+): Promise<MemoryDiffResult> {
+  const params = new URLSearchParams({
+    path,
+    from: from.toString(),
+    to: to.toString(),
+  });
+  return fetchApi<MemoryDiffResult>(`/memory/diff?${params}`);
+}

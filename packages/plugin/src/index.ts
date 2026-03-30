@@ -42,6 +42,7 @@ import { initializeDemoIfNeeded } from './demo.js';
 import { OpenClawConfigReader } from './config/openclaw-config.js';
 import { syncCronRuns } from './cron/cron-reader.js';
 import { FlowBus } from './events/flow-bus.js';
+import { captureSnapshots, resolveWorkspaceRoot } from './memory/scanner.js';
 
 /**
  * Get the UI dist path (relative to this file when bundled)
@@ -66,12 +67,14 @@ const pluginState: {
   reader: SpanReader | null;
   config: ClawLensConfig | null;
   cronSyncInterval: ReturnType<typeof setInterval> | null;
+  memorySnapshotInterval: ReturnType<typeof setInterval> | null;
   flowBus: FlowBus | null;
 } = {
   writer: null,
   reader: null,
   config: null,
   cronSyncInterval: null,
+  memorySnapshotInterval: null,
   flowBus: null,
 };
 
@@ -149,6 +152,21 @@ function register(api: PluginAPI): void {
         logger.warn('[clawlens] Periodic cron sync failed:', error);
       }
     }, 60_000);
+
+    // Memory file snapshots — initial scan then every 5 minutes
+    const workspaceRoot = resolveWorkspaceRoot();
+    try {
+      captureSnapshots(db, workspaceRoot, logger);
+    } catch (error) {
+      logger.warn('[clawlens] Initial memory snapshot scan failed:', error);
+    }
+    pluginState.memorySnapshotInterval = setInterval(() => {
+      try {
+        captureSnapshots(db, workspaceRoot, logger);
+      } catch (error) {
+        logger.warn('[clawlens] Periodic memory snapshot failed:', error);
+      }
+    }, 5 * 60_000);
 
     // Initialize demo mode if needed (or run backfill)
     initializeDemoMode(reader, writer, config, logger).catch((error) => {
@@ -239,6 +257,10 @@ export function shutdown(): void {
     if (pluginState.cronSyncInterval) {
       clearInterval(pluginState.cronSyncInterval);
       pluginState.cronSyncInterval = null;
+    }
+    if (pluginState.memorySnapshotInterval) {
+      clearInterval(pluginState.memorySnapshotInterval);
+      pluginState.memorySnapshotInterval = null;
     }
     closeDb();
     pluginState.writer = null;

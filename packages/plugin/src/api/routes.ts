@@ -16,6 +16,7 @@ import { handleAnalytics, ANALYTICS_QUERY_TYPES } from './analytics.js';
 import { handleTopology } from './topology.js';
 import { handleBots } from './bots.js';
 import { handleCronJobs, handleCronJobRuns, handleCronSummary } from './cron.js';
+import { handleMemoryFiles, handleMemoryFileRead, handleMemoryHistory, handleMemoryDiff } from './memory.js';
 import type { OpenClawConfigReader } from '../config/openclaw-config.js';
 
 /**
@@ -311,6 +312,44 @@ export function createRouteHandlers(
         }
       },
     },
+
+    // API: Memory browser (workspace files and snapshots)
+    ...(db
+      ? [
+          {
+            path: '/clawlens/api/memory/history',
+            auth: 'gateway' as const,
+            match: 'exact' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              handleMemoryHistory(req, res, db, logger);
+              return true;
+            },
+          },
+          {
+            path: '/clawlens/api/memory/diff',
+            auth: 'gateway' as const,
+            match: 'exact' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              handleMemoryDiff(req, res, db, logger);
+              return true;
+            },
+          },
+          {
+            path: '/clawlens/api/memory/files',
+            auth: 'gateway' as const,
+            match: 'prefix' as const,
+            handler: async (req: IncomingMessage, res: ServerResponse) => {
+              const path = getUrlPath(req.url);
+              if (path === '/clawlens/api/memory/files' || path === '/clawlens/api/memory/files/') {
+                handleMemoryFiles(req, res, db, logger);
+              } else {
+                handleMemoryFileRead(req, res, db, logger);
+              }
+              return true;
+            },
+          },
+        ]
+      : []),
 
     // API: Cron jobs (scheduled workflows)
     ...(db

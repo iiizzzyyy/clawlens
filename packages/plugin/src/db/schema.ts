@@ -9,7 +9,7 @@ import type Database from 'better-sqlite3';
 /**
  * Current schema version - increment when making schema changes
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * DDL for spans table - the core data store
@@ -164,6 +164,26 @@ CREATE INDEX IF NOT EXISTS idx_cron_runs_status ON cron_runs(status) WHERE statu
 `;
 
 /**
+ * DDL for memory_snapshots table — periodic file content snapshots
+ */
+export const CREATE_MEMORY_SNAPSHOTS_TABLE = `
+CREATE TABLE IF NOT EXISTS memory_snapshots (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  path          TEXT NOT NULL,
+  content_hash  TEXT NOT NULL,
+  content       TEXT NOT NULL,
+  captured_at   INTEGER NOT NULL
+);
+`;
+
+/**
+ * DDL for memory_snapshots indexes
+ */
+export const CREATE_MEMORY_SNAPSHOTS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_memory_snapshots_path_time ON memory_snapshots(path, captured_at);
+`;
+
+/**
  * All table creation statements in order
  */
 export const TABLE_DDL = [
@@ -172,12 +192,13 @@ export const TABLE_DDL = [
   CREATE_IMPORTS_TABLE,
   CREATE_SCHEMA_VERSION_TABLE,
   CREATE_CRON_RUNS_TABLE,
+  CREATE_MEMORY_SNAPSHOTS_TABLE,
 ];
 
 /**
  * All index creation statements
  */
-export const INDEX_DDL = [CREATE_SPANS_INDEXES, CREATE_CRON_RUNS_INDEXES];
+export const INDEX_DDL = [CREATE_SPANS_INDEXES, CREATE_CRON_RUNS_INDEXES, CREATE_MEMORY_SNAPSHOTS_INDEXES];
 
 /**
  * Get current schema version from database
