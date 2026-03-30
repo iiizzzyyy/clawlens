@@ -136,7 +136,7 @@ describe('Build Pipeline', () => {
       const packagePath = join(PLUGIN_DIR, 'package.json');
       const pkg = JSON.parse(require('fs').readFileSync(packagePath, 'utf-8'));
 
-      expect(pkg.name).toBe('@clawlens/plugin');
+      expect(pkg.name).toBe('clawlens');
       expect(pkg.version).toMatch(/^\d+\.\d+\.\d+/);
       expect(pkg.main).toBe('dist/index.js');
       expect(pkg.types).toBe('dist/index.d.ts');

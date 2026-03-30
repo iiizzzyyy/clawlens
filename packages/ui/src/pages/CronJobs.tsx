@@ -17,7 +17,7 @@ const POLL_OPTIONS = [
   { label: '5m', value: 300_000 },
 ] as const;
 
-type SortField = 'name' | 'agentId' | 'schedule' | 'lastRun' | 'duration' | 'cost' | 'status';
+type SortField = 'name' | 'agentId' | 'schedule' | 'lastRun' | 'duration' | 'cost' | 'tokens' | 'tokensIn' | 'tokensOut' | 'status';
 type SortDir = 'asc' | 'desc';
 type StatusFilter = 'all' | 'ok' | 'failing' | 'disabled';
 
@@ -48,6 +48,14 @@ function formatDuration(ms: number | null | undefined): string {
 function formatCost(usd: number | null | undefined): string {
   if (usd == null) return '--';
   return `$${usd.toFixed(2)}`;
+}
+
+function formatTokens(n: number | null | undefined): string {
+  if (n == null) return '--';
+  if (n === 0) return '0';
+  if (n < 1_000) return String(n);
+  if (n < 1_000_000) return `${(n / 1_000).toFixed(1)}k`;
+  return `${(n / 1_000_000).toFixed(2)}M`;
 }
 
 function getJobStatus(job: CronJob): string {
@@ -125,6 +133,15 @@ export default function CronJobs() {
           break;
         case 'cost':
           cmp = (a.lastRunCostUsd ?? 0) - (b.lastRunCostUsd ?? 0);
+          break;
+        case 'tokens':
+          cmp = ((a.tokensIn ?? 0) + (a.tokensOut ?? 0)) - ((b.tokensIn ?? 0) + (b.tokensOut ?? 0));
+          break;
+        case 'tokensIn':
+          cmp = (a.tokensIn ?? 0) - (b.tokensIn ?? 0);
+          break;
+        case 'tokensOut':
+          cmp = (a.tokensOut ?? 0) - (b.tokensOut ?? 0);
           break;
         case 'status': {
           const sa = getJobStatus(a);
@@ -249,6 +266,9 @@ export default function CronJobs() {
                 <Th field="lastRun" label="Last Run" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 <Th field="duration" label="Duration" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 <Th field="cost" label="Cost" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                <Th field="tokens" label="Tokens" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                <Th field="tokensIn" label="Tokens In" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                <Th field="tokensOut" label="Tokens Out" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 <Th field="status" label="Status" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider">History</th>
               </tr>
@@ -397,6 +417,9 @@ function JobRow({
         <td className="px-4 py-3 text-slate-400">{formatRelativeTime(job.state.lastRunAtMs)}</td>
         <td className="px-4 py-3 text-slate-400">{formatDuration(job.avgDurationMs)}</td>
         <td className="px-4 py-3 text-slate-400">{formatCost(job.lastRunCostUsd)}</td>
+        <td className="px-4 py-3 text-slate-400">{formatTokens(job.tokensIn != null && job.tokensOut != null ? job.tokensIn + job.tokensOut : null)}</td>
+        <td className="px-4 py-3 text-slate-400">{formatTokens(job.tokensIn)}</td>
+        <td className="px-4 py-3 text-slate-400">{formatTokens(job.tokensOut)}</td>
         <td className="px-4 py-3">
           <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(status)}`}>
             {status}
@@ -420,7 +443,7 @@ function JobRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} className="p-0">
+          <td colSpan={11} className="p-0">
             <ExpandedJobDetail job={job} onNavigateToSession={onNavigateToSession} />
           </td>
         </tr>
@@ -488,6 +511,9 @@ function ExpandedJobDetail({
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Duration</th>
                 <th className="px-3 py-2 text-left">Cost</th>
+                <th className="px-3 py-2 text-left">Tokens</th>
+                <th className="px-3 py-2 text-left">Tokens In</th>
+                <th className="px-3 py-2 text-left">Tokens Out</th>
                 <th className="px-3 py-2 text-left">Summary</th>
                 <th className="px-3 py-2 text-left">Session</th>
               </tr>
@@ -511,6 +537,9 @@ function ExpandedJobDetail({
                   </td>
                   <td className="px-3 py-2">{formatDuration(run.durationMs)}</td>
                   <td className="px-3 py-2">{formatCost(run.costUsd)}</td>
+                  <td className="px-3 py-2">{formatTokens(run.tokensIn != null && run.tokensOut != null ? run.tokensIn + run.tokensOut : null)}</td>
+                  <td className="px-3 py-2">{formatTokens(run.tokensIn)}</td>
+                  <td className="px-3 py-2">{formatTokens(run.tokensOut)}</td>
                   <td className="px-3 py-2 max-w-xs truncate" title={run.summary || ''}>
                     {run.summary ? run.summary.slice(0, 80) + (run.summary.length > 80 ? '...' : '') : '--'}
                   </td>

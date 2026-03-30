@@ -102,80 +102,130 @@ function register(api: PluginAPI): void {
       return;
     }
 
-    // Initialize database
-    const dbPath = expandPath(config.dbPath);
-    logger.info(`[clawlens] Initializing database at ${dbPath}`);
+    // Lazy DB initialization — deferred until first actual use.
+    // This prevents the better-sqlite3 native module from loading during
+    // plugin registration, which would crash when the CLI (Node 25) validates
+    // the plugin. The Gateway (Node 22) loads it on first hook/API call.
+    type DbResources = { db: ReturnType<typeof getDb>; writer: SpanWriter; reader: SpanReader };
+    let dbResources: DbResources | null = null;
+    let dbInitStarted = false;
 
-    const db = getDb({ path: dbPath });
-    const writer = new SpanWriter(db);
-    const reader = new SpanReader(db);
+    function ensureDb(): DbResources {
+      if (!dbResources) {
+        const dbPath = expandPath(config.dbPath);
+        logger.info(`[clawlens] Initializing database at ${dbPath}`);
+        const db = getDb({ path: dbPath });
+        const writer = new SpanWriter(db);
+        const reader = new SpanReader(db);
+        dbResources = { db, writer, reader };
+        pluginState.writer = writer;
+        pluginState.reader = reader;
+      }
+      return dbResources;
+    }
 
-    pluginState.writer = writer;
-    pluginState.reader = reader;
+    // Proxy wrappers: hooks and routes receive these immediately,
+    // but the native module only loads on first property access.
+    const lazyWriter = new Proxy({} as SpanWriter, {
+      get(_, prop) {
+        const { writer } = ensureDb();
+        const value = (writer as any)[prop];
+        return typeof value === 'function' ? value.bind(writer) : value;
+      },
+    });
+
+    const lazyReader = new Proxy({} as SpanReader, {
+      get(_, prop) {
+        const { reader } = ensureDb();
+        const value = (reader as any)[prop];
+        return typeof value === 'function' ? value.bind(reader) : value;
+      },
+    });
 
     // Create flow event bus for live visualization
     const flowBus = new FlowBus(100);
     pluginState.flowBus = flowBus;
 
-    // Register lifecycle hooks
+    // Register lifecycle hooks (uses lazy writer — no DB load yet)
     logger.info('[clawlens] Registering lifecycle hooks');
-    registerHooks(api, writer, flowBus);
+    registerHooks(api, lazyWriter, flowBus);
 
     // Initialize OpenClaw config reader for agent metadata
     const configReader = new OpenClawConfigReader(undefined, logger);
 
-    // Register HTTP routes
+    // Register HTTP routes (uses lazy reader — no DB load yet)
     const uiDistPath = getUiDistPath();
     logger.info(`[clawlens] Registering HTTP routes (UI path: ${uiDistPath})`);
 
+    // Lazy DB proxy for cron routes
+    const lazyDb = new Proxy({} as ReturnType<typeof getDb>, {
+      get(_, prop) {
+        const { db } = ensureDb();
+        const value = (db as any)[prop];
+        return typeof value === 'function' ? value.bind(db) : value;
+      },
+    });
+
     registerRoutes(
       (route: PluginRouteConfig) => api.registerHttpRoute(route),
-      reader,
+      lazyReader,
       uiDistPath,
       logger,
       configReader,
-      db,
+      lazyDb,
       flowBus
     );
 
-    // Sync cron run data from JSONL files into SQLite
-    try {
-      syncCronRuns(db, logger);
-    } catch (error) {
-      logger.warn('[clawlens] Initial cron sync failed:', error);
-    }
-    // Periodic re-sync every 60s
-    pluginState.cronSyncInterval = setInterval(() => {
+    // Deferred startup tasks: cron sync, demo/backfill
+    // Runs on next tick so registration completes first.
+    setTimeout(() => {
+      if (dbInitStarted) return;
+      dbInitStarted = true;
       try {
-        syncCronRuns(db, logger);
-      } catch (error) {
-        logger.warn('[clawlens] Periodic cron sync failed:', error);
-      }
-    }, 60_000);
+        const { db, reader, writer } = ensureDb();
 
-    // Memory file snapshots — initial scan then every 5 minutes
-    const workspaceRoot = resolveWorkspaceRoot();
-    try {
-      captureSnapshots(db, workspaceRoot, logger);
-    } catch (error) {
-      logger.warn('[clawlens] Initial memory snapshot scan failed:', error);
-    }
-    pluginState.memorySnapshotInterval = setInterval(() => {
-      try {
-        captureSnapshots(db, workspaceRoot, logger);
-      } catch (error) {
-        logger.warn('[clawlens] Periodic memory snapshot failed:', error);
-      }
-    }, 5 * 60_000);
+        // Sync cron run data from JSONL files into SQLite
+        try {
+          syncCronRuns(db, logger);
+        } catch (error) {
+          logger.warn('[clawlens] Initial cron sync failed:', error);
+        }
+        // Periodic re-sync every 60s
+        pluginState.cronSyncInterval = setInterval(() => {
+          try {
+            syncCronRuns(db, logger);
+          } catch (error) {
+            logger.warn('[clawlens] Periodic cron sync failed:', error);
+          }
+        }, 60_000);
 
-    // Initialize demo mode if needed (or run backfill)
-    initializeDemoMode(reader, writer, config, logger).catch((error) => {
-      logger.error('[clawlens] Demo/backfill initialization failed:', error);
-    });
+        // Memory file snapshots — initial scan then every 5 minutes
+        const workspaceRoot = resolveWorkspaceRoot();
+        try {
+          captureSnapshots(db, workspaceRoot, logger);
+        } catch (error) {
+          logger.warn(`[clawlens] Initial memory snapshot scan failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        pluginState.memorySnapshotInterval = setInterval(() => {
+          try {
+            captureSnapshots(db, workspaceRoot, logger);
+          } catch (error) {
+            logger.warn(`[clawlens] Periodic memory snapshot failed: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }, 5 * 60_000);
+
+        // Initialize demo mode if needed (or run backfill)
+        initializeDemoMode(reader, writer, config, logger).catch((error) => {
+          logger.error('[clawlens] Demo/backfill initialization failed:', error);
+        });
+      } catch (error) {
+        logger.error('[clawlens] Deferred DB initialization failed:', error);
+      }
+    }, 0);
 
     // Log startup summary
-    logger.info('[clawlens] Plugin initialized successfully', {
-      dbPath,
+    logger.info('[clawlens] Plugin registered successfully (DB deferred)', {
+      dbPath: config.dbPath,
       retentionDays: config.retentionDays,
       backfillOnStart: config.backfillOnStart,
       excludeAgents: config.excludeAgents,

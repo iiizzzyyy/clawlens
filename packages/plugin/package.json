@@ -22,7 +22,7 @@
     ]
   },
   "scripts": {
-    "build": "tsup && npm run copy-fixtures",
+    "build": "rm -f dist/index.js dist/index.d.ts dist/index.js.map && tsup && npm run copy-fixtures",
     "copy-fixtures": "mkdir -p dist/fixtures && cp -r fixtures/demo dist/fixtures/",
     "dev": "tsup --watch",
     "clean": "rm -rf dist *.tsbuildinfo",

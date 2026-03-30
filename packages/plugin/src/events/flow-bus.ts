@@ -24,6 +24,14 @@ export interface FlowEvent {
     status: 'ok' | 'error' | 'pending';
     timestamp: number;
     metadata: Record<string, unknown>;
+    // Enrichment fields (populated from DB spans, optional from hooks)
+    costUsd?: number;
+    tokensIn?: number;
+    tokensOut?: number;
+    durationMs?: number | null;
+    model?: string | null;
+    sessionId?: string;
+    errorMessage?: string | null;
   };
 }
 

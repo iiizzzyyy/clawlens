@@ -4,11 +4,29 @@
  * Provides singleton access to the database with WAL mode enabled.
  */
 
-import Database from 'better-sqlite3';
+import type DatabaseConstructor from 'better-sqlite3';
+import { createRequire } from 'node:module';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { migrate } from './schema.js';
+
+/**
+ * Lazy-load better-sqlite3 native module.
+ *
+ * OpenClaw's CLI (Node 25) and Gateway (Node 22) run different ABI versions.
+ * By deferring the native require until first DB use, the CLI can validate
+ * the plugin without loading the native binary — only the Gateway loads it.
+ */
+let _Database: typeof DatabaseConstructor | null = null;
+
+function loadDatabase(): typeof DatabaseConstructor {
+  if (!_Database) {
+    const require = createRequire(import.meta.url);
+    _Database = require('better-sqlite3') as typeof DatabaseConstructor;
+  }
+  return _Database!;
+}
 
 /**
  * Default database path
@@ -18,7 +36,7 @@ export const DEFAULT_DB_PATH = '~/.openclaw/clawlens/clawlens.db';
 /**
  * Singleton database instance
  */
-let dbInstance: Database.Database | null = null;
+let dbInstance: DatabaseConstructor.Database | null = null;
 
 /**
  * Path to current database (for singleton tracking)
@@ -79,7 +97,7 @@ export interface DbOptions {
  * @param options - Connection options
  * @returns Database instance
  */
-export function getDb(options: DbOptions = {}): Database.Database {
+export function getDb(options: DbOptions = {}): DatabaseConstructor.Database {
   const { path = DEFAULT_DB_PATH, verbose = false, forceNew = false } = options;
 
   const expandedPath = path === ':memory:' ? ':memory:' : expandPath(path);
@@ -100,6 +118,7 @@ export function getDb(options: DbOptions = {}): Database.Database {
   }
 
   // Create new connection
+  const Database = loadDatabase();
   dbInstance = new Database(expandedPath, {
     verbose: verbose ? console.log : undefined,
   });
@@ -152,7 +171,8 @@ export function getDbPath(): string | null {
  *
  * @returns New in-memory database instance
  */
-export function createTestDb(): Database.Database {
+export function createTestDb(): DatabaseConstructor.Database {
+  const Database = loadDatabase();
   const db = new Database(':memory:');
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');

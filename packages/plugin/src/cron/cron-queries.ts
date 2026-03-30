@@ -5,6 +5,25 @@
 import type Database from 'better-sqlite3';
 import type { CronJob } from './cron-reader.js';
 
+// ── Model pricing fallback ──
+// Per-token pricing (USD per token) for models where OpenClaw doesn't supply cost.
+// Used as fallback when span cost_usd is 0.
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  'minimax-m2.7:cloud': { input: 0.30 / 1_000_000, output: 1.20 / 1_000_000 },
+  'deepseek-v3.2:cloud': { input: 0.28 / 1_000_000, output: 0.40 / 1_000_000 },
+};
+
+function estimateCost(
+  model: string | null,
+  tokensIn: number | null,
+  tokensOut: number | null
+): number | null {
+  if (!model || !tokensIn) return null;
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return null;
+  return (tokensIn * pricing.input) + ((tokensOut ?? 0) * pricing.output);
+}
+
 // ── Response types ──
 
 export interface CronSummary {
@@ -19,6 +38,8 @@ export interface CronSummary {
 export interface CronJobWithStats extends CronJob {
   avgDurationMs: number | null;
   lastRunCostUsd: number | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
   recentRuns: RunDot[];
   totalRuns: number;
   errorCount: number;
@@ -39,6 +60,8 @@ export interface CronRunEntry {
   summary: string | null;
   sessionId: string | null;
   costUsd: number | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
 }
 
 // ── Queries ──
@@ -63,19 +86,32 @@ export function getCronSummary(
     }
   }
 
-  // Estimate daily cost: sum of cost_usd from spans for sessions run in last 7 days, divided by 7
-  const costRow = db
+  // Estimate daily cost: sum cost from spans (with pricing fallback) for runs in last 7 days
+  const costRows = db
     .prepare(
       `
-    SELECT COALESCE(SUM(s.cost_usd), 0) as total_cost
+    SELECT cr.model, cr.tokens_in, cr.tokens_out,
+      COALESCE((SELECT SUM(cost_usd) FROM spans WHERE session_id = cr.session_id AND span_type = 'llm_call'), 0) as span_cost
     FROM cron_runs cr
-    JOIN spans s ON s.session_id = cr.session_id
     WHERE cr.run_at_ms > ? AND cr.status = 'ok'
   `
     )
-    .get(Date.now() - 7 * 86400_000) as { total_cost: number } | undefined;
+    .all(Date.now() - 7 * 86400_000) as Array<{
+    model: string | null;
+    tokens_in: number | null;
+    tokens_out: number | null;
+    span_cost: number;
+  }>;
 
-  const estimatedDailyCostUsd = costRow ? costRow.total_cost / 7 : null;
+  let totalCost = 0;
+  for (const row of costRows) {
+    if (row.span_cost > 0) {
+      totalCost += row.span_cost;
+    } else {
+      totalCost += estimateCost(row.model, row.tokens_in, row.tokens_out) ?? 0;
+    }
+  }
+  const estimatedDailyCostUsd = costRows.length > 0 ? totalCost / 7 : null;
 
   return {
     activeCount,
@@ -118,11 +154,12 @@ export function getJobsWithStats(
     LIMIT 10
   `);
 
-  // Last run cost via spans join
+  // Last run cost (sum of LLM call costs) and tokens, with model for pricing fallback
   const costStmt = db.prepare(`
-    SELECT s.cost_usd
+    SELECT
+      (SELECT SUM(cost_usd) FROM spans WHERE session_id = cr.session_id AND span_type = 'llm_call') as cost_usd,
+      cr.tokens_in, cr.tokens_out, cr.model
     FROM cron_runs cr
-    JOIN spans s ON s.session_id = cr.session_id
     WHERE cr.job_id = ?
     ORDER BY cr.ts DESC
     LIMIT 1
@@ -137,13 +174,20 @@ export function getJobsWithStats(
       .map((r) => ({ ts: r.ts, status: r.status || 'ok' }));
 
     const costRow = costStmt.get(job.id) as
-      | { cost_usd: number }
+      | { cost_usd: number | null; tokens_in: number | null; tokens_out: number | null; model: string | null }
       | undefined;
+
+    const spanCost = costRow?.cost_usd;
+    const lastRunCostUsd = (spanCost && spanCost > 0)
+      ? spanCost
+      : estimateCost(costRow?.model ?? null, costRow?.tokens_in ?? null, costRow?.tokens_out ?? null);
 
     return {
       ...job,
       avgDurationMs: stats?.avg_duration_ms ?? null,
-      lastRunCostUsd: costRow?.cost_usd ?? null,
+      lastRunCostUsd,
+      tokensIn: costRow?.tokens_in ?? null,
+      tokensOut: costRow?.tokens_out ?? null,
       recentRuns,
       totalRuns: stats?.total_runs ?? 0,
       errorCount: stats?.error_count ?? 0,
@@ -163,9 +207,9 @@ export function getJobRuns(
     SELECT
       cr.ts, cr.run_at_ms, cr.status, cr.error, cr.duration_ms,
       cr.model, cr.summary, cr.session_id,
-      s.cost_usd
+      cr.tokens_in, cr.tokens_out,
+      (SELECT SUM(cost_usd) FROM spans WHERE session_id = cr.session_id AND span_type = 'llm_call') as cost_usd
     FROM cron_runs cr
-    LEFT JOIN spans s ON s.session_id = cr.session_id AND s.parent_id IS NULL
     WHERE cr.job_id = ?
     ORDER BY cr.ts DESC
     LIMIT ? OFFSET ?
@@ -180,6 +224,8 @@ export function getJobRuns(
     model: string | null;
     summary: string | null;
     session_id: string | null;
+    tokens_in: number | null;
+    tokens_out: number | null;
     cost_usd: number | null;
   }>;
 
@@ -192,7 +238,11 @@ export function getJobRuns(
     model: r.model,
     summary: r.summary,
     sessionId: r.session_id,
-    costUsd: r.cost_usd,
+    tokensIn: r.tokens_in,
+    tokensOut: r.tokens_out,
+    costUsd: (r.cost_usd && r.cost_usd > 0)
+      ? r.cost_usd
+      : estimateCost(r.model, r.tokens_in, r.tokens_out),
   }));
 }
 

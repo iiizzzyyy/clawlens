@@ -357,6 +357,8 @@ export interface CronJob {
   updatedAtMs?: number;
   avgDurationMs: number | null;
   lastRunCostUsd: number | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
   recentRuns: RunDot[];
   totalRuns: number;
   errorCount: number;
@@ -372,6 +374,8 @@ export interface CronRunEntry {
   summary: string | null;
   sessionId: string | null;
   costUsd: number | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
 }
 
 export interface CronSummary {
