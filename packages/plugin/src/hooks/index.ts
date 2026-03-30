@@ -293,6 +293,20 @@ export function registerHooks(api: PluginAPI, writer: SpanWriter, flowBus?: Flow
           success: typedCtx.success,
         });
         onSubagentEnded(event, typedCtx, writer, spanContext);
+        flowBus?.emit({
+          type: 'span',
+          data: {
+            spanType: 'subagent_ended',
+            agentId: parseAgentIdFromSessionKey(typedCtx.childSessionId ?? '') ?? 'unknown',
+            name: `Subagent ended: ${typedCtx.childSessionId ?? 'unknown'}`,
+            status: typedCtx.success ? 'ok' : 'error',
+            timestamp: Date.now(),
+            metadata: {
+              childSessionId: typedCtx.childSessionId,
+              success: typedCtx.success,
+            },
+          },
+        });
       } catch (error) {
         api.logger.error('[clawlens] Error in subagent_ended hook:', error);
       }

@@ -66,11 +66,13 @@ const pluginState: {
   reader: SpanReader | null;
   config: ClawLensConfig | null;
   cronSyncInterval: ReturnType<typeof setInterval> | null;
+  flowBus: FlowBus | null;
 } = {
   writer: null,
   reader: null,
   config: null,
   cronSyncInterval: null,
+  flowBus: null,
 };
 
 /**
@@ -110,6 +112,7 @@ function register(api: PluginAPI): void {
 
     // Create flow event bus for live visualization
     const flowBus = new FlowBus(100);
+    pluginState.flowBus = flowBus;
 
     // Register lifecycle hooks
     logger.info('[clawlens] Registering lifecycle hooks');

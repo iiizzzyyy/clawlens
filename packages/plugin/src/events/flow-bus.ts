@@ -12,7 +12,8 @@ export type FlowSpanType =
   | 'message_sent'
   | 'llm_output'
   | 'after_tool_call'
-  | 'subagent_spawned';
+  | 'subagent_spawned'
+  | 'subagent_ended';
 
 export interface FlowEvent {
   type: 'span';
