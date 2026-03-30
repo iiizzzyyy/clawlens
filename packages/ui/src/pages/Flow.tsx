@@ -1,13 +1,13 @@
 /**
- * Live Flow Visualization page
+ * Live Flow Dashboard
  *
- * Animated real-time diagram showing message flow through the system:
- * User -> Channel -> Brain (LLM) -> Tools -> Response
- *
- * Connects via SSE to /clawlens/api/flow/stream for live events.
+ * Real-time agent activity dashboard with stats strip, per-agent cards,
+ * enriched event feed, and span detail panel with action buttons.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Sparkline from '../components/Sparkline';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,7 +20,8 @@ type FlowSpanType =
   | 'message_sent'
   | 'llm_output'
   | 'after_tool_call'
-  | 'subagent_spawned';
+  | 'subagent_spawned'
+  | 'subagent_ended';
 
 interface FlowEventData {
   spanType: FlowSpanType;
@@ -29,6 +30,13 @@ interface FlowEventData {
   status: 'ok' | 'error' | 'pending';
   timestamp: number;
   metadata: Record<string, unknown>;
+  costUsd?: number;
+  tokensIn?: number;
+  tokensOut?: number;
+  durationMs?: number | null;
+  model?: string | null;
+  sessionId?: string;
+  errorMessage?: string | null;
 }
 
 interface FlowEvent {
@@ -36,45 +44,62 @@ interface FlowEvent {
   data: FlowEventData;
 }
 
-type NodeId = 'user' | 'channel' | 'brain' | 'tools';
+interface AgentStats {
+  agentId: string;
+  llmCount: number;
+  toolCount: number;
+  totalCost: number;
+  errorCount: number;
+  lastModel: string | null;
+  lastEventTs: number;
+  costHistory: number[];
+}
+
+type FilterState = {
+  agentId?: string;
+  sessionId?: string;
+  spanType?: FlowSpanType;
+};
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_FEED_EVENTS = 200;
+const ACTIVE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+const SPAN_TYPE_LABELS: Record<FlowSpanType, string> = {
+  session_start: 'Session',
+  session_end: 'Session End',
+  message_received: 'Turn',
+  message_sent: 'Msg Sent',
+  llm_output: 'LLM',
+  after_tool_call: 'Tool',
+  subagent_spawned: 'Subagent',
+  subagent_ended: 'Sub End',
+};
+
+const SPAN_TYPE_COLORS: Record<FlowSpanType, string> = {
+  session_start: 'text-cyan-400',
+  session_end: 'text-slate-400',
+  message_received: 'text-blue-400',
+  message_sent: 'text-cyan-400',
+  llm_output: 'text-purple-400',
+  after_tool_call: 'text-amber-400',
+  subagent_spawned: 'text-pink-400',
+  subagent_ended: 'text-pink-300',
+};
+
+const SPAN_TYPE_BG: Record<string, string> = {
+  session_start: 'bg-cyan-400/10',
+  llm_output: 'bg-purple-400/10',
+  after_tool_call: 'bg-amber-400/10',
+  subagent_spawned: 'bg-pink-400/10',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Map span types to the node they primarily activate */
-function spanTypeToNode(spanType: FlowSpanType): NodeId {
-  switch (spanType) {
-    case 'session_start':
-    case 'session_end':
-      return 'user';
-    case 'message_received':
-    case 'message_sent':
-      return 'channel';
-    case 'llm_output':
-      return 'brain';
-    case 'after_tool_call':
-    case 'subagent_spawned':
-      return 'tools';
-  }
-}
-
-/** Map span types to the edge they animate (source -> target) */
-function spanTypeToEdge(spanType: FlowSpanType): [NodeId, NodeId] | null {
-  switch (spanType) {
-    case 'message_received':
-      return ['user', 'channel'];
-    case 'llm_output':
-      return ['channel', 'brain'];
-    case 'after_tool_call':
-    case 'subagent_spawned':
-      return ['brain', 'tools'];
-    case 'message_sent':
-      return ['channel', 'user'];
-    default:
-      return null;
-  }
-}
 
 function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString('en-US', {
@@ -85,44 +110,68 @@ function formatTime(ts: number): string {
   });
 }
 
-const SPAN_TYPE_LABELS: Record<FlowSpanType, string> = {
-  session_start: 'Session Start',
-  session_end: 'Session End',
-  message_received: 'Msg Received',
-  message_sent: 'Msg Sent',
-  llm_output: 'LLM Output',
-  after_tool_call: 'Tool Call',
-  subagent_spawned: 'Subagent',
-};
-
-const SPAN_TYPE_COLORS: Record<FlowSpanType, string> = {
-  session_start: 'text-green-400',
-  session_end: 'text-slate-400',
-  message_received: 'text-blue-400',
-  message_sent: 'text-cyan-400',
-  llm_output: 'text-purple-400',
-  after_tool_call: 'text-amber-400',
-  subagent_spawned: 'text-pink-400',
-};
-
-// ---------------------------------------------------------------------------
-// Node definitions
-// ---------------------------------------------------------------------------
-
-interface FlowNodeDef {
-  id: NodeId;
-  label: string;
-  icon: string;
-  color: string;
-  glowColor: string;
+function formatCost(usd: number | undefined): string {
+  if (!usd || usd === 0) return '-';
+  if (usd < 0.001) return '<$0.001';
+  return `$${usd.toFixed(3)}`;
 }
 
-const FLOW_NODES: FlowNodeDef[] = [
-  { id: 'user', label: 'User', icon: '\u{1F464}', color: 'border-blue-500', glowColor: 'shadow-blue-500/60' },
-  { id: 'channel', label: 'Channel', icon: '\u{1F4E8}', color: 'border-cyan-500', glowColor: 'shadow-cyan-500/60' },
-  { id: 'brain', label: 'Brain (LLM)', icon: '\u{1F9E0}', color: 'border-purple-500', glowColor: 'shadow-purple-500/60' },
-  { id: 'tools', label: 'Tools', icon: '\u{1F527}', color: 'border-amber-500', glowColor: 'shadow-amber-500/60' },
-];
+function formatTokens(n: number | undefined): string {
+  if (!n || n === 0) return '-';
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatDuration(ms: number | null | undefined): string {
+  if (!ms) return '-';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function formatRelativeTime(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60_000) return 'just now';
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
+  return `${Math.floor(diff / 86400_000)}d ago`;
+}
+
+/** Derive per-agent stats from events array */
+function deriveAgentStats(events: FlowEvent[]): AgentStats[] {
+  const map = new Map<string, AgentStats>();
+
+  for (const e of events) {
+    const { agentId, spanType, costUsd, timestamp, model } = e.data;
+    let stats = map.get(agentId);
+    if (!stats) {
+      stats = {
+        agentId,
+        llmCount: 0,
+        toolCount: 0,
+        totalCost: 0,
+        errorCount: 0,
+        lastModel: null,
+        lastEventTs: 0,
+        costHistory: [],
+      };
+      map.set(agentId, stats);
+    }
+
+    if (spanType === 'llm_output') {
+      stats.llmCount++;
+      if (model) stats.lastModel = model;
+    }
+    if (spanType === 'after_tool_call') stats.toolCount++;
+    if (e.data.status === 'error') stats.errorCount++;
+    if (costUsd && costUsd > 0) {
+      stats.totalCost += costUsd;
+      stats.costHistory.push(costUsd);
+    }
+    if (timestamp > stats.lastEventTs) stats.lastEventTs = timestamp;
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.lastEventTs - a.lastEventTs);
+}
 
 // ---------------------------------------------------------------------------
 // Components
@@ -141,60 +190,114 @@ function ConnectionStatus({ connected }: { connected: boolean }) {
   );
 }
 
-function FlowNode({
-  node,
-  eventCount,
-  active,
-}: {
-  node: FlowNodeDef;
-  eventCount: number;
-  active: boolean;
-}) {
+function StatsStrip({ events }: { events: FlowEvent[] }) {
+  const stats = useMemo(() => {
+    const sessions = new Set(events.map((e) => e.data.sessionId).filter(Boolean));
+    const totalCost = events.reduce((sum, e) => sum + (e.data.costUsd ?? 0), 0);
+    const tokensIn = events.reduce((sum, e) => sum + (e.data.tokensIn ?? 0), 0);
+    const tokensOut = events.reduce((sum, e) => sum + (e.data.tokensOut ?? 0), 0);
+    const errors = events.filter((e) => e.data.status === 'error').length;
+    const llmSpans = events.filter(
+      (e) => e.data.spanType === 'llm_output' && e.data.durationMs
+    );
+    const avgLatency =
+      llmSpans.length > 0
+        ? llmSpans.reduce((sum, e) => sum + (e.data.durationMs ?? 0), 0) / llmSpans.length
+        : 0;
+
+    return { sessions: sessions.size, totalCost, tokensIn, tokensOut, errors, avgLatency };
+  }, [events]);
+
+  const items = [
+    { label: 'Active Sessions', value: String(stats.sessions), color: 'text-white' },
+    { label: 'Total Cost', value: formatCost(stats.totalCost), color: 'text-emerald-400' },
+    {
+      label: 'Tokens (In / Out)',
+      value: `${formatTokens(stats.tokensIn)} / ${formatTokens(stats.tokensOut)}`,
+      color: 'text-blue-400',
+    },
+    { label: 'Errors', value: String(stats.errors), color: stats.errors > 0 ? 'text-red-400' : 'text-white' },
+    { label: 'Avg Latency', value: formatDuration(stats.avgLatency), color: 'text-amber-400' },
+  ];
+
+  return (
+    <div className="grid grid-cols-5 gap-3 mb-4">
+      {items.map((item) => (
+        <div key={item.label} className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">{item.label}</div>
+          <div className={`text-xl font-bold mt-0.5 ${item.color}`}>{item.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AgentCard({ stats, onFilter }: { stats: AgentStats; onFilter: (agentId: string) => void }) {
+  const navigate = useNavigate();
+  const isActive = Date.now() - stats.lastEventTs < ACTIVE_THRESHOLD_MS;
+
   return (
     <div
-      className={`
-        relative flex flex-col items-center justify-center
-        w-32 h-32 rounded-2xl border-2 bg-slate-800
-        transition-all duration-300
-        ${node.color}
-        ${active ? `shadow-lg ${node.glowColor} scale-105` : 'shadow-md shadow-slate-900/50'}
-      `}
+      className={`flex-1 min-w-[260px] bg-slate-800 rounded-lg p-3 border border-slate-700 ${
+        isActive ? 'border-l-[3px] border-l-emerald-500' : 'border-l-[3px] border-l-slate-600'
+      }`}
     >
-      <span className="text-3xl">{node.icon}</span>
-      <span className="mt-1 text-sm font-semibold text-white">{node.label}</span>
-      <span className="mt-0.5 text-xs text-slate-400">{eventCount} events</span>
-      {active && (
-        <div
-          className={`absolute inset-0 rounded-2xl border-2 ${node.color} animate-ping opacity-30`}
-        />
-      )}
-    </div>
-  );
-}
-
-function FlowEdge({ active, reverse }: { active: boolean; reverse?: boolean }) {
-  return (
-    <div className="flex items-center mx-2 w-16 relative">
-      <div className="w-full h-0.5 bg-slate-600 relative overflow-hidden rounded">
-        {active && (
-          <div
-            className={`absolute inset-y-0 w-4 bg-cyan-400 rounded ${
-              reverse ? 'animate-flow-reverse' : 'animate-flow'
-            }`}
-          />
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">{'\u{1F916}'}</span>
+        <span className="text-white font-bold text-sm">{stats.agentId}</span>
+        <span
+          className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${
+            isActive
+              ? 'bg-emerald-900/50 text-emerald-400'
+              : 'bg-slate-700 text-slate-400'
+          }`}
+        >
+          {isActive ? 'ACTIVE' : 'IDLE'}
+        </span>
+        <span className="text-[10px] text-slate-500 ml-auto">
+          {formatRelativeTime(stats.lastEventTs)}
+        </span>
+      </div>
+      {/* Row 1: Key stats */}
+      <div className="flex gap-3 text-xs text-slate-400 mb-2">
+        <span>{'\u{1F9E0}'} <span className="text-slate-200">{stats.llmCount}</span> LLM</span>
+        <span>{'\u{1F527}'} <span className="text-slate-200">{stats.toolCount}</span> tools</span>
+        <span>{'\u{1F4B0}'} <span className="text-emerald-400">{formatCost(stats.totalCost)}</span></span>
+        {stats.errorCount > 0 && (
+          <span>{'\u26A0\uFE0F'} <span className="text-amber-400">{stats.errorCount}</span></span>
         )}
       </div>
-      <div
-        className={`absolute ${reverse ? 'left-0 rotate-180' : 'right-0'} w-0 h-0
-        border-t-[4px] border-t-transparent
-        border-b-[4px] border-b-transparent
-        border-l-[6px] ${active ? 'border-l-cyan-400' : 'border-l-slate-600'}`}
-      />
+      {/* Row 2: Model, sparkline, link */}
+      <div className="flex items-center gap-2 text-[10px] text-slate-500">
+        {stats.lastModel && (
+          <span className="bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded text-purple-400 text-[9px] truncate max-w-[120px]">
+            {stats.lastModel}
+          </span>
+        )}
+        <div className="w-16 h-4 flex-shrink-0">
+          <Sparkline data={stats.costHistory.slice(-20)} color="#10b981" height={16} />
+        </div>
+        <button
+          onClick={() => navigate(`/sessions?agentId=${stats.agentId}`)}
+          className="text-blue-400 hover:text-blue-300 underline ml-auto"
+        >
+          Sessions {'\u2192'}
+        </button>
+      </div>
     </div>
   );
 }
 
-function EventFeed({ events }: { events: FlowEvent[] }) {
+function EnrichedEventFeed({
+  events,
+  selectedIndex,
+  onSelect,
+}: {
+  events: FlowEvent[];
+  selectedIndex: number | null;
+  onSelect: (index: number) => void;
+}) {
   const feedRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
 
@@ -207,54 +310,71 @@ function EventFeed({ events }: { events: FlowEvent[] }) {
   const handleScroll = useCallback(() => {
     if (!feedRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = feedRef.current;
-    // If user scrolled up more than 50px from bottom, disable auto-scroll
     setAutoScroll(scrollHeight - scrollTop - clientHeight < 50);
   }, []);
 
   return (
-    <div className="mt-6 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">Live Event Feed</h3>
-        <span className="text-xs text-slate-400">{events.length} events</span>
+    <div className="flex-[3] bg-slate-900 rounded-lg border border-slate-700 overflow-hidden flex flex-col">
+      <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+        <span className="text-xs font-semibold text-white">Event Feed</span>
+        <span className="text-[10px] text-slate-500">{events.length} events</span>
       </div>
       <div
         ref={feedRef}
         onScroll={handleScroll}
-        className="h-64 overflow-y-auto p-2 space-y-1 font-mono text-xs"
+        className="flex-1 overflow-y-auto p-1 font-mono text-[11px]"
       >
         {events.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-slate-500">
+          <div className="flex items-center justify-center h-full text-slate-500 text-xs">
             Waiting for events...
           </div>
         ) : (
-          events.map((event, i) => (
-            <div
-              key={`${event.data.timestamp}-${i}`}
-              className="flex items-start gap-3 px-2 py-1.5 rounded hover:bg-slate-700/50"
-            >
-              <span className="text-slate-500 shrink-0">
-                {formatTime(event.data.timestamp)}
-              </span>
-              <span
-                className={`shrink-0 w-24 font-medium ${
-                  SPAN_TYPE_COLORS[event.data.spanType] ?? 'text-slate-300'
+          events.map((event, i) => {
+            const d = event.data;
+            const isSelected = selectedIndex === i;
+            const isError = d.status === 'error';
+
+            return (
+              <div
+                key={`${d.timestamp}-${i}`}
+                onClick={() => onSelect(i)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer ${
+                  isSelected
+                    ? 'bg-slate-800 border-l-2 border-l-blue-400'
+                    : isError
+                      ? 'bg-red-950/30 hover:bg-red-950/50'
+                      : 'hover:bg-slate-800/50'
                 }`}
               >
-                {SPAN_TYPE_LABELS[event.data.spanType] ?? event.data.spanType}
-              </span>
-              <span className="text-slate-300 truncate">{event.data.name}</span>
-              <span className="text-slate-500 shrink-0 ml-auto">{event.data.agentId}</span>
-              {event.data.status === 'error' && (
-                <span className="text-red-400 shrink-0">ERR</span>
-              )}
-            </div>
-          ))
+                <span className="text-slate-500 w-[52px] shrink-0">{formatTime(d.timestamp)}</span>
+                <span
+                  className={`w-[42px] shrink-0 font-semibold ${
+                    SPAN_TYPE_COLORS[d.spanType] ?? 'text-slate-300'
+                  }`}
+                >
+                  {SPAN_TYPE_LABELS[d.spanType] ?? d.spanType}
+                </span>
+                <span className={`flex-1 truncate ${isError ? 'text-red-300' : 'text-slate-300'}`}>
+                  {isError && d.errorMessage ? `${d.name} \u2014 ${d.errorMessage}` : d.name}
+                </span>
+                {d.durationMs ? (
+                  <span className="text-[9px] bg-slate-800 px-1 rounded text-slate-400 shrink-0">
+                    {formatDuration(d.durationMs)}
+                  </span>
+                ) : null}
+                <span className="w-[48px] text-right shrink-0 text-emerald-400">
+                  {formatCost(d.costUsd)}
+                </span>
+                <span className="w-[40px] text-right shrink-0 text-slate-500">{d.agentId}</span>
+              </div>
+            );
+          })
         )}
       </div>
       {!autoScroll && (
         <button
           onClick={() => setAutoScroll(true)}
-          className="w-full py-1 text-xs text-center text-cyan-400 hover:bg-slate-700 border-t border-slate-700"
+          className="w-full py-1 text-[10px] text-center text-cyan-400 hover:bg-slate-800 border-t border-slate-700"
         >
           Resume auto-scroll
         </button>
@@ -263,188 +383,237 @@ function EventFeed({ events }: { events: FlowEvent[] }) {
   );
 }
 
+function DetailPanel({
+  event,
+  onFilter,
+}: {
+  event: FlowEvent | null;
+  onFilter: (filter: FilterState) => void;
+}) {
+  const navigate = useNavigate();
+
+  if (!event) {
+    return (
+      <div className="flex-[2] bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-center">
+        <span className="text-slate-500 text-xs">Click an event to view details</span>
+      </div>
+    );
+  }
+
+  const d = event.data;
+
+  const fields: [string, string | null, string?][] = [
+    ['Agent', d.agentId],
+    ['Model', d.model ?? null, 'text-purple-400'],
+    ['Duration', formatDuration(d.durationMs)],
+    ['Tokens In', formatTokens(d.tokensIn)],
+    ['Tokens Out', formatTokens(d.tokensOut)],
+    ['Cost', formatCost(d.costUsd), 'text-emerald-400'],
+    ['Status', d.status.toUpperCase(), d.status === 'error' ? 'text-red-400' : 'text-emerald-400'],
+    ...(d.errorMessage ? [['Error', d.errorMessage, 'text-red-300'] as [string, string, string]] : []),
+    ['Session', d.sessionId ? `${d.sessionId.slice(0, 12)}...` : '-', 'text-blue-400'],
+    ['Time', formatTime(d.timestamp)],
+  ];
+
+  return (
+    <div className="flex-[2] bg-slate-900 rounded-lg border border-slate-700 overflow-hidden flex flex-col">
+      <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2">
+        <span className="text-xs font-semibold text-white">Span Detail</span>
+        <span
+          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+            SPAN_TYPE_BG[d.spanType] ?? 'bg-slate-800'
+          } ${SPAN_TYPE_COLORS[d.spanType] ?? 'text-slate-300'}`}
+        >
+          {SPAN_TYPE_LABELS[d.spanType] ?? d.spanType}
+        </span>
+      </div>
+      <div className="flex-1 px-3 py-2 overflow-auto">
+        <div className="text-white font-semibold text-sm mb-2 truncate">{d.name}</div>
+        <div className="grid grid-cols-[72px_1fr] gap-y-1 gap-x-2 text-[11px] mb-3">
+          {fields.map(([label, value, color]) =>
+            value ? (
+              <div key={label} className="contents">
+                <span className="text-slate-500">{label}</span>
+                <span className={color ?? 'text-slate-200'}>{value}</span>
+              </div>
+            ) : null
+          )}
+        </div>
+        {/* Action buttons */}
+        <div className="border-t border-slate-700 pt-2 grid grid-cols-2 gap-1.5">
+          {d.sessionId && (
+            <button
+              onClick={() => navigate(`/replay/${d.sessionId}`)}
+              className="bg-slate-800 border border-slate-700 text-blue-400 hover:bg-slate-700 px-2 py-1.5 rounded text-[10px] font-medium"
+            >
+              {'\u{1F50D}'} Open Replay
+            </button>
+          )}
+          <button
+            onClick={() => onFilter({ agentId: d.agentId })}
+            className="bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 px-2 py-1.5 rounded text-[10px] font-medium"
+          >
+            {'\u{1F916}'} Filter Agent
+          </button>
+          {d.sessionId && (
+            <button
+              onClick={() => onFilter({ sessionId: d.sessionId })}
+              className="bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 px-2 py-1.5 rounded text-[10px] font-medium"
+            >
+              {'\u{1F4CB}'} Filter Session
+            </button>
+          )}
+          <button
+            onClick={() => onFilter({ spanType: d.spanType })}
+            className="bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 px-2 py-1.5 rounded text-[10px] font-medium"
+          >
+            {'\u26A1'} Filter Type
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
-const MAX_FEED_EVENTS = 200;
-const ACTIVE_DURATION_MS = 1500;
-
 export default function Flow() {
   const [connected, setConnected] = useState(false);
   const [events, setEvents] = useState<FlowEvent[]>([]);
-  const [nodeCounts, setNodeCounts] = useState<Record<NodeId, number>>({
-    user: 0,
-    channel: 0,
-    brain: 0,
-    tools: 0,
-  });
-  const [activeNodes, setActiveNodes] = useState<Record<NodeId, number>>({
-    user: 0,
-    channel: 0,
-    brain: 0,
-    tools: 0,
-  });
-  const [activeEdges, setActiveEdges] = useState<Record<string, number>>({
-    'user->channel': 0,
-    'channel->brain': 0,
-    'brain->tools': 0,
-    'channel->user': 0,
-  });
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [filter, setFilter] = useState<FilterState>({});
 
+  // Polling — identical mechanism to the original, just stores events
   useEffect(() => {
-    const sseUrl = `${window.location.origin}/clawlens/api/flow/stream`;
-    const source = new EventSource(sseUrl);
+    let lastTs = 0;
+    let mounted = true;
 
-    source.onopen = () => {
-      setConnected(true);
-    };
-
-    source.onmessage = (msg) => {
+    const poll = async () => {
       try {
-        const event = JSON.parse(msg.data) as FlowEvent;
+        const res = await fetch(
+          `${window.location.origin}/clawlens/api/flow/events?since=${lastTs}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch');
+        const body = await res.json();
+        if (!mounted) return;
 
-        // Append to feed (bounded)
-        setEvents((prev) => {
-          const next = [...prev, event];
-          return next.length > MAX_FEED_EVENTS ? next.slice(-MAX_FEED_EVENTS) : next;
-        });
+        setConnected(true);
 
-        // Activate the relevant node
-        const nodeId = spanTypeToNode(event.data.spanType);
-        setNodeCounts((prev) => ({ ...prev, [nodeId]: prev[nodeId] + 1 }));
-
-        const now = Date.now();
-        setActiveNodes((prev) => ({ ...prev, [nodeId]: now }));
-
-        // Activate the relevant edge
-        const edge = spanTypeToEdge(event.data.spanType);
-        if (edge) {
-          const edgeKey = `${edge[0]}->${edge[1]}`;
-          setActiveEdges((prev) => ({ ...prev, [edgeKey]: now }));
+        const newEvents: FlowEvent[] = body.data ?? [];
+        if (newEvents.length > 0) {
+          lastTs = Math.max(...newEvents.map((e) => e.data.timestamp));
+          setEvents((prev) => {
+            const next = [...prev, ...newEvents];
+            return next.length > MAX_FEED_EVENTS ? next.slice(-MAX_FEED_EVENTS) : next;
+          });
         }
       } catch {
-        // Ignore unparseable messages (e.g. keepalive comments)
+        if (mounted) setConnected(false);
       }
     };
 
-    source.onerror = () => {
-      setConnected(false);
-    };
+    poll();
+    const interval = setInterval(poll, 2000);
 
     return () => {
-      source.close();
-      setConnected(false);
+      mounted = false;
+      clearInterval(interval);
     };
   }, []);
 
-  // Timer to clear active states after ACTIVE_DURATION_MS
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
+  // Derive agent stats from all events
+  const agentStats = useMemo(() => deriveAgentStats(events), [events]);
 
-      setActiveNodes((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const key of Object.keys(next) as NodeId[]) {
-          if (next[key] > 0 && now - next[key] > ACTIVE_DURATION_MS) {
-            next[key] = 0;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
+  // Apply filters to events for the feed
+  const filteredEvents = useMemo(() => {
+    if (!filter.agentId && !filter.sessionId && !filter.spanType) return events;
+    return events.filter((e) => {
+      if (filter.agentId && e.data.agentId !== filter.agentId) return false;
+      if (filter.sessionId && e.data.sessionId !== filter.sessionId) return false;
+      if (filter.spanType && e.data.spanType !== filter.spanType) return false;
+      return true;
+    });
+  }, [events, filter]);
 
-      setActiveEdges((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const key of Object.keys(next)) {
-          if (next[key] > 0 && now - next[key] > ACTIVE_DURATION_MS) {
-            next[key] = 0;
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
-    }, 200);
+  const selectedEvent = selectedIndex !== null ? filteredEvents[selectedIndex] ?? null : null;
 
-    return () => clearInterval(interval);
+  const handleFilter = useCallback((newFilter: FilterState) => {
+    setFilter(newFilter);
+    setSelectedIndex(null);
   }, []);
 
-  const isEdgeActive = (from: NodeId, to: NodeId) => {
-    const key = `${from}->${to}`;
-    return activeEdges[key] > 0;
-  };
+  const clearFilter = useCallback(() => {
+    setFilter({});
+    setSelectedIndex(null);
+  }, []);
+
+  const hasActiveFilter = filter.agentId || filter.sessionId || filter.spanType;
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Live Flow</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Real-time message flow visualization
+          <p className="text-sm text-slate-400 mt-0.5">
+            Real-time agent activity dashboard
           </p>
         </div>
         <ConnectionStatus connected={connected} />
       </div>
 
-      {/* Flow diagram */}
-      <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-8">
-        <div className="flex items-center justify-center">
-          {FLOW_NODES.map((node, i) => (
-            <div key={node.id} className="flex items-center">
-              <FlowNode
-                node={node}
-                eventCount={nodeCounts[node.id]}
-                active={activeNodes[node.id] > 0}
-              />
-              {i < FLOW_NODES.length - 1 && (
-                <FlowEdge
-                  active={isEdgeActive(
-                    FLOW_NODES[i].id,
-                    FLOW_NODES[i + 1].id
-                  )}
-                />
-              )}
-            </div>
+      {/* Section 1: Stats Strip */}
+      <StatsStrip events={events} />
+
+      {/* Section 2: Agent Cards */}
+      {agentStats.length > 0 && (
+        <div className="flex flex-wrap gap-3 mb-4">
+          {agentStats.map((stats) => (
+            <AgentCard
+              key={stats.agentId}
+              stats={stats}
+              onFilter={(agentId) => handleFilter({ agentId })}
+            />
           ))}
         </div>
+      )}
 
-        {/* Return path indicator */}
-        <div className="flex justify-center mt-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>Response path:</span>
-            <span className={isEdgeActive('channel', 'user') ? 'text-cyan-400' : ''}>
-              Tools {'\u2192'} Brain {'\u2192'} Channel {'\u2192'} User
+      {/* Filter indicator */}
+      {hasActiveFilter && (
+        <div className="flex items-center gap-2 mb-2 text-xs">
+          <span className="text-slate-400">Filtered:</span>
+          {filter.agentId && (
+            <span className="bg-slate-800 border border-slate-700 text-blue-400 px-2 py-0.5 rounded">
+              Agent: {filter.agentId}
             </span>
-            {isEdgeActive('channel', 'user') && (
-              <span className="text-cyan-400 animate-pulse">{'\u25C0'}</span>
-            )}
-          </div>
+          )}
+          {filter.sessionId && (
+            <span className="bg-slate-800 border border-slate-700 text-blue-400 px-2 py-0.5 rounded">
+              Session: {filter.sessionId.slice(0, 12)}...
+            </span>
+          )}
+          {filter.spanType && (
+            <span className="bg-slate-800 border border-slate-700 text-blue-400 px-2 py-0.5 rounded">
+              Type: {SPAN_TYPE_LABELS[filter.spanType]}
+            </span>
+          )}
+          <button onClick={clearFilter} className="text-slate-400 hover:text-white">
+            {'\u2715'} Clear
+          </button>
         </div>
+      )}
+
+      {/* Section 3: Split Event View */}
+      <div className="flex gap-3" style={{ height: 'calc(100vh - 380px)', minHeight: '300px' }}>
+        <EnrichedEventFeed
+          events={filteredEvents}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+        />
+        <DetailPanel event={selectedEvent} onFilter={handleFilter} />
       </div>
-
-      {/* Event feed */}
-      <EventFeed events={events} />
-
-      {/* Custom animation styles */}
-      <style>{`
-        @keyframes flow-right {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(400%); }
-        }
-        @keyframes flow-left {
-          0% { transform: translateX(400%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-flow {
-          animation: flow-right 0.8s ease-in-out infinite;
-        }
-        .animate-flow-reverse {
-          animation: flow-left 0.8s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
