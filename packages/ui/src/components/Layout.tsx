@@ -20,6 +20,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/analytics', label: 'Analytics', icon: '📊' },
     { path: '/flow', label: 'Live Flow', icon: '⚡' },
     { path: '/memory', label: 'Memory', icon: '🧠' },
+    { path: '/logs', label: 'Logs', icon: '📜' },
   ];
 
   const isActive = (path: string) => {

@@ -18,6 +18,13 @@ import { handleBots } from './bots.js';
 import { handleCronJobs, handleCronJobRuns, handleCronSummary } from './cron.js';
 import { handleMemoryFiles, handleMemoryFileRead, handleMemoryHistory, handleMemoryDiff } from './memory.js';
 import type { OpenClawConfigReader } from '../config/openclaw-config.js';
+import {
+  readRecentLines,
+  startTailing,
+  filterLines,
+  getDefaultLogDir,
+  type ParsedLogLine,
+} from '../logs/log-reader.js';
 
 /**
  * HTTP route configuration (matches OpenClaw plugin SDK)
@@ -168,6 +175,86 @@ export function createRouteHandlers(
           },
         ]
       : []),
+
+    // API: Log streaming (SSE)
+    {
+      path: '/clawlens/api/logs/stream',
+      auth: 'gateway' as const,
+      match: 'prefix' as const,
+      handler: async (req: IncomingMessage, res: ServerResponse) => {
+        try {
+          // Parse query params for filters
+          const queryStr = req.url?.split('?')[1] ?? '';
+          const params = new URLSearchParams(queryStr);
+          const levelFilter = params.get('level') ?? undefined;
+          const agentFilter = params.get('agent') ?? undefined;
+          const searchFilter = params.get('search') ?? undefined;
+          const filters = { level: levelFilter, agent: agentFilter, search: searchFilter };
+
+          const logDir = getDefaultLogDir();
+
+          // Set SSE headers
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+          });
+
+          // Send initial state: last 200 lines
+          const initial = filterLines(readRecentLines(logDir, 200), filters);
+          for (const line of initial) {
+            res.write(`data: ${JSON.stringify(line)}\n\n`);
+          }
+
+          // If log dir doesn't exist, inform client
+          if (!existsSync(logDir)) {
+            res.write(`: no log directory found at ${logDir}\n\n`);
+          }
+
+          // Start tailing for new lines
+          const tail = startTailing(
+            {
+              onLines(lines: ParsedLogLine[]) {
+                const filtered = filterLines(lines, filters);
+                for (const line of filtered) {
+                  try {
+                    res.write(`data: ${JSON.stringify(line)}\n\n`);
+                  } catch {
+                    // Client disconnected
+                  }
+                }
+              },
+              onError(error: unknown) {
+                logger.error('[clawlens] Log tail error:', error);
+              },
+            },
+            { logDir, pollIntervalMs: 2000 }
+          );
+
+          // Keep-alive ping every 30s
+          const keepAlive = setInterval(() => {
+            try {
+              res.write(': keepalive\n\n');
+            } catch {
+              // Client disconnected
+            }
+          }, 30_000);
+
+          // Cleanup on client disconnect
+          req.on('close', () => {
+            tail.stop();
+            clearInterval(keepAlive);
+          });
+
+          return true;
+        } catch (error) {
+          logger.error('[clawlens] Error in log stream:', error);
+          sendError(res, 'INTERNAL_ERROR', 'Internal server error', 500);
+          return true;
+        }
+      },
+    },
 
     // API: Bots overview
     ...(configReader

@@ -7,6 +7,7 @@ import Replay from './pages/Replay';
 import Analytics from './pages/Analytics';
 import Flow from './pages/Flow';
 import Memory from './pages/Memory';
+import Logs from './pages/Logs';
 // Topology page removed from nav — API still available at /clawlens/api/topology
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/flow" element={<Flow />} />
           <Route path="/memory" element={<Memory />} />
+          <Route path="/logs" element={<Logs />} />
         </Routes>
       </Layout>
     </BrowserRouter>
