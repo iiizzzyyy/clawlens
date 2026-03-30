@@ -458,7 +458,7 @@ describe('Route Handlers', () => {
 
     const routes = createRouteHandlers(reader, '/tmp/ui', logger);
 
-    expect(routes).toHaveLength(5); // sessions list, sessions prefix, analytics, topology, UI
+    expect(routes).toHaveLength(6); // sessions list, sessions prefix, analytics, topology, logs stream, UI
     expect(routes.every((r) => r.path.startsWith('/clawlens'))).toBe(true);
     expect(routes.every((r) => typeof r.handler === 'function')).toBe(true);
   });
