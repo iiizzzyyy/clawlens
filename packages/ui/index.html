@@ -8,6 +8,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <title>ClawLens</title>
+    <script>
+      window.onerror = function(msg, src, line, col, err) {
+        var d = document.getElementById('clawlens-error');
+        if (!d) { d = document.createElement('div'); d.id = 'clawlens-error'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:16px;background:#1a1a2e;color:#ff6b6b;font-family:monospace;font-size:13px;z-index:99999;border-bottom:2px solid #ff6b6b;white-space:pre-wrap;max-height:40vh;overflow:auto'; document.body.appendChild(d); }
+        d.textContent += '[ERROR] ' + msg + '\n  at ' + src + ':' + line + ':' + col + '\n';
+      };
+      window.onunhandledrejection = function(e) {
+        var d = document.getElementById('clawlens-error');
+        if (!d) { d = document.createElement('div'); d.id = 'clawlens-error'; d.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:16px;background:#1a1a2e;color:#ff6b6b;font-family:monospace;font-size:13px;z-index:99999;border-bottom:2px solid #ff6b6b;white-space:pre-wrap;max-height:40vh;overflow:auto'; document.body.appendChild(d); }
+        d.textContent += '[UNHANDLED] ' + (e.reason && e.reason.message || e.reason || 'Unknown') + '\n';
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

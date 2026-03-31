@@ -18,7 +18,8 @@ export interface UseAnalyticsResult {
  */
 export function useAnalytics(
   queryType: string | null,
-  params: AnalyticsParams = {}
+  params: AnalyticsParams = {},
+  enabled = true
 ): UseAnalyticsResult {
   const [data, setData] = useState<AnalyticsResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,10 +29,8 @@ export function useAnalytics(
   const refetch = () => setRefetchKey((k) => k + 1);
 
   useEffect(() => {
-    if (!queryType) {
-      setData(null);
-      setLoading(false);
-      setError(null);
+    if (!queryType || !enabled) {
+      if (!enabled) setLoading(false);
       return;
     }
 
@@ -62,7 +61,7 @@ export function useAnalytics(
     return () => {
       cancelled = true;
     };
-  }, [queryType, JSON.stringify(params), refetchKey]);
+  }, [queryType, JSON.stringify(params), refetchKey, enabled]);
 
   return { data, loading, error, refetch };
 }

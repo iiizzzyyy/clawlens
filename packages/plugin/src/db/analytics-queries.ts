@@ -118,26 +118,19 @@ export function costByAgentModel(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): CostByAgentModelResult[] {
-  const conditions = buildTimeConditions(params, 's');
+  const conditions = buildTimeConditions(params);
 
   const query = `
     SELECT
-      s.agent_id,
-      COALESCE(l.model, 'unknown') as model,
-      SUM(l.cost_usd) as total_cost,
-      COUNT(DISTINCT s.session_id) as session_count,
-      AVG(session_costs.total) as avg_cost_per_session
-    FROM spans s
-    INNER JOIN spans l ON l.session_id = s.session_id AND l.span_type = 'llm_call'
-    LEFT JOIN (
-      SELECT session_id, SUM(cost_usd) as total
-      FROM spans
-      WHERE span_type = 'llm_call'
-      GROUP BY session_id
-    ) session_costs ON session_costs.session_id = s.session_id
-    WHERE s.span_type = 'session'
+      agent_id,
+      COALESCE(model, 'unknown') as model,
+      SUM(cost_usd) as total_cost,
+      COUNT(DISTINCT session_id) as session_count,
+      SUM(cost_usd) / MAX(COUNT(DISTINCT session_id), 1) as avg_cost_per_session
+    FROM spans
+    WHERE span_type = 'llm_call'
       ${conditions.where ? 'AND ' + conditions.where : ''}
-    GROUP BY s.agent_id, l.model
+    GROUP BY agent_id, model
     ORDER BY total_cost DESC
     LIMIT 50
   `;
@@ -168,24 +161,35 @@ export function costPerSuccessfulTask(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): CostPerSuccessfulTaskResult[] {
-  const conditions = buildTimeConditions(params, 's');
+  const conditions = buildTimeConditions(params);
 
   const query = `
+    WITH turn_stats AS (
+      SELECT agent_id,
+             COUNT(CASE WHEN status != 'error' THEN 1 END) as successful_turns
+      FROM spans
+      WHERE span_type = 'turn'
+        ${conditions.where ? 'AND ' + conditions.where : ''}
+      GROUP BY agent_id
+    ),
+    cost_stats AS (
+      SELECT agent_id, SUM(cost_usd) as total_cost
+      FROM spans
+      WHERE span_type = 'llm_call'
+        ${conditions.where ? 'AND ' + conditions.where : ''}
+      GROUP BY agent_id
+    )
     SELECT
-      s.agent_id,
-      COUNT(DISTINCT CASE WHEN t.status != 'error' THEN t.id END) as successful_turns,
-      SUM(l.cost_usd) as total_cost,
+      t.agent_id,
+      t.successful_turns,
+      COALESCE(c.total_cost, 0) as total_cost,
       CASE
-        WHEN COUNT(DISTINCT CASE WHEN t.status != 'error' THEN t.id END) > 0
-        THEN SUM(l.cost_usd) / COUNT(DISTINCT CASE WHEN t.status != 'error' THEN t.id END)
+        WHEN t.successful_turns > 0
+        THEN COALESCE(c.total_cost, 0) / t.successful_turns
         ELSE 0
       END as cost_per_task
-    FROM spans s
-    INNER JOIN spans t ON t.session_id = s.session_id AND t.span_type = 'turn'
-    LEFT JOIN spans l ON l.parent_id = t.id AND l.span_type = 'llm_call'
-    WHERE s.span_type = 'session'
-      ${conditions.where ? 'AND ' + conditions.where : ''}
-    GROUP BY s.agent_id
+    FROM turn_stats t
+    LEFT JOIN cost_stats c ON c.agent_id = t.agent_id
     ORDER BY cost_per_task DESC
     LIMIT 50
   `;
@@ -255,38 +259,32 @@ export function retryClustering(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): RetryClusteringResult[] {
-  const conditions = buildTimeConditions(params, 'te');
+  const conditions = buildTimeConditions(params);
 
   const query = `
-    WITH tool_sequences AS (
-      SELECT
-        t.agent_id,
-        json_extract(te.metadata, '$.toolName') as tool_name,
-        te.parent_id as turn_id,
-        te.start_ts,
-        LAG(te.start_ts) OVER (PARTITION BY te.parent_id, json_extract(te.metadata, '$.toolName') ORDER BY te.start_ts) as prev_start
-      FROM spans te
-      INNER JOIN spans t ON t.id = te.parent_id AND t.span_type = 'turn'
-      WHERE te.span_type = 'tool_exec'
-        AND json_extract(te.metadata, '$.toolName') IS NOT NULL
-        ${conditions.where ? 'AND ' + conditions.where : ''}
-    ),
-    retries AS (
+    WITH tool_calls AS (
       SELECT
         agent_id,
-        tool_name,
-        turn_id,
-        start_ts - prev_start as time_between
-      FROM tool_sequences
-      WHERE prev_start IS NOT NULL
-        AND start_ts - prev_start < 60000
+        parent_id as turn_id,
+        json_extract(metadata, '$.toolName') as tool_name,
+        start_ts,
+        LAG(start_ts) OVER (
+          PARTITION BY parent_id, json_extract(metadata, '$.toolName')
+          ORDER BY start_ts
+        ) as prev_start
+      FROM spans
+      WHERE span_type = 'tool_exec'
+        AND json_extract(metadata, '$.toolName') IS NOT NULL
+        ${conditions.where ? 'AND ' + conditions.where : ''}
     )
     SELECT
       agent_id,
       tool_name,
       COUNT(*) as retry_count,
-      AVG(time_between) as avg_time_between_retries
-    FROM retries
+      AVG(start_ts - prev_start) as avg_time_between_retries
+    FROM tool_calls
+    WHERE prev_start IS NOT NULL
+      AND start_ts - prev_start < 60000
     GROUP BY agent_id, tool_name
     HAVING COUNT(*) >= 1
     ORDER BY retry_count DESC
@@ -465,21 +463,20 @@ export function tokenWaste(
   db: Database.Database,
   params: AnalyticsParams = {}
 ): TokenWasteResult[] {
-  const conditions = buildTimeConditions(params, 's');
+  const conditions = buildTimeConditions(params);
 
   const query = `
-    WITH session_tokens AS (
+    WITH ordered_calls AS (
       SELECT
-        s.agent_id,
-        s.session_id,
-        l.id as llm_call_id,
-        l.tokens_in,
-        l.cost_usd,
-        LAG(l.tokens_in) OVER (PARTITION BY s.session_id ORDER BY l.start_ts) as prev_tokens_in,
-        ROW_NUMBER() OVER (PARTITION BY s.session_id ORDER BY l.start_ts) as call_num
-      FROM spans s
-      INNER JOIN spans l ON l.session_id = s.session_id AND l.span_type = 'llm_call'
-      WHERE s.span_type = 'session' ${conditions.where ? 'AND ' + conditions.where : ''}
+        agent_id,
+        session_id,
+        tokens_in,
+        cost_usd,
+        LAG(tokens_in) OVER (PARTITION BY session_id ORDER BY start_ts) as prev_tokens_in,
+        ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY start_ts) as call_num
+      FROM spans
+      WHERE span_type = 'llm_call'
+        ${conditions.where ? 'AND ' + conditions.where : ''}
     ),
     waste_calc AS (
       SELECT
@@ -491,7 +488,7 @@ export function tokenWaste(
           ELSE 0
         END) as reread_tokens,
         SUM(cost_usd) as total_cost
-      FROM session_tokens
+      FROM ordered_calls
       GROUP BY agent_id, session_id
     )
     SELECT

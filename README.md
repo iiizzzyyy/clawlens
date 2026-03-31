@@ -17,6 +17,15 @@ ClawLens is an **investigation and debugging tool** for OpenClaw — purpose-bui
 ![Session Replay](docs/screenshots/session-replay.png)
 *Step through any conversation turn-by-turn with cost, token, and timing annotations*
 
+![Analytics](docs/screenshots/analytics.png)
+*Cross-session investigative queries: cost patterns, tool failures, latency percentiles*
+
+![Session List](docs/screenshots/sessions-list.png)
+*Browse and filter all sessions with sortable columns*
+
+<!-- TODO: capture screenshot → docs/screenshots/cron-jobs.png -->
+<!-- TODO: capture screenshot → docs/screenshots/live-flow.png -->
+
 ---
 
 ## Installation
@@ -24,7 +33,7 @@ ClawLens is an **investigation and debugging tool** for OpenClaw — purpose-bui
 ### Prerequisites
 
 - **OpenClaw** v2026.2 or later
-- **Node.js** v22.x (must match OpenClaw's Node version for native module compatibility)
+- **Node.js** — must match OpenClaw's runtime Node version for native module compatibility (check with `/opt/homebrew/bin/node --version`)
 - **pnpm** v8+
 
 ### Install from source
@@ -41,7 +50,7 @@ pnpm install
 pnpm deploy:openclaw
 ```
 
-The deploy script handles building, copying to the extensions directory, installing production dependencies, and rebuilding `better-sqlite3` for Node 22 — regardless of which Node version is active in your shell.
+The deploy script handles building, copying to the extensions directory, installing production dependencies, and rebuilding `better-sqlite3` for the system Node version.
 
 <details>
 <summary>Manual installation (if you prefer)</summary>
@@ -56,14 +65,14 @@ cp -r packages/plugin/dist/* ~/.openclaw/extensions/clawlens/dist/
 cp packages/plugin/package.json ~/.openclaw/extensions/clawlens/
 cp packages/plugin/openclaw.plugin.json ~/.openclaw/extensions/clawlens/
 
-# Install runtime dependencies (MUST use Node 22)
+# Install runtime dependencies
 cd ~/.openclaw/extensions/clawlens && npm install --production
 
-# Rebuild native modules for OpenClaw's Node 22
+# Rebuild native modules for OpenClaw's Node version
 npm rebuild better-sqlite3
 ```
 
-**Important:** Steps 5-6 must run under Node 22. If your shell has a different Node version active, use `nvm use 22` first or specify the Node 22 path explicitly.
+**Important:** The `npm rebuild` step must use the same Node version that OpenClaw runs (the system Node at `/opt/homebrew/bin/node`).
 </details>
 
 ### Configure OpenClaw
@@ -142,6 +151,8 @@ Browse all sessions with filtering and sorting:
 - Sortable columns: Agent, Start Time, Duration, Tokens In, Tokens Out, Tools, Status, Errors, Spans
 - Click any session to open the full replay view
 
+![Session List](docs/screenshots/sessions-list.png)
+
 ### 📊 **Cross-Session Analytics**
 
 Answer investigative questions that cut across sessions:
@@ -153,6 +164,9 @@ Answer investigative questions that cut across sessions:
 - **Latency percentiles** — "Is my bottleneck LLM inference or tool execution?"
 - **Token waste** — "How much am I spending on re-reading history?"
 - Time-range filtering on all queries
+- Sequential card loading to prevent backend overload
+
+![Analytics](docs/screenshots/analytics.png)
 
 ### ⏰ **Scheduled Jobs Dashboard**
 
@@ -164,6 +178,43 @@ Monitor all cron-triggered agent workflows in one place:
 - **Filters** — Search by name, filter by agent, status (All / OK / Failing / Disabled)
 - **Auto-refresh** — Configurable polling (Manual, 30s, 1m, 5m)
 - Reads directly from OpenClaw cron JSONL run files — no extra configuration
+
+<!-- TODO: capture screenshot → docs/screenshots/cron-jobs.png -->
+
+### 🌊 **Live Flow Dashboard**
+
+Real-time agent activity dashboard with three stacked sections:
+
+- **Stats strip** — Five live counters: active sessions, total cost, tokens in/out, errors, avg latency
+- **Agent cards** — Per-agent breakdown with LLM/tool counts, cost sparkline, model badge, active/idle status, and "Sessions" deep-link
+- **Enriched event feed** — Color-coded event rows with timestamp, span type, name, duration, cost, and agent ID
+- **Detail panel** — Click any event to see full span info (model, tokens, duration, cost, session, error) with action buttons: Open Replay, Filter Agent, Filter Session, Filter Type
+- **Filter bar** — Narrow the feed by agent, session, or span type; clear with one click
+- Uses polling (2s interval) for compatibility with the OpenClaw gateway
+
+<!-- TODO: capture screenshot → docs/screenshots/live-flow.png -->
+
+### 📝 **Logs**
+
+Color-coded live log viewer for agent activity:
+
+- **Level filtering** — Toggle error, warn, info, debug log levels
+- **Agent filtering** — Filter logs by specific agent
+- **Text search** — Free-text search across log messages
+- **Auto-scroll** — Follows new log entries with manual scroll override
+
+<!-- TODO: capture screenshot → docs/screenshots/logs.png -->
+
+### 🧠 **Memory Browser**
+
+Browse and track changes to agent workspace files:
+
+- **File tree sidebar** — Navigable directory tree of agent memory files
+- **Content viewer** — View current file contents with syntax highlighting
+- **Snapshot history** — Timeline of file changes with timestamps
+- **Diff viewer** — Compare any two snapshots to see what changed
+
+<!-- TODO: capture screenshot → docs/screenshots/memory-browser.png -->
 
 ---
 
@@ -245,6 +296,11 @@ ClawLens exposes a REST API at `/clawlens/api/`:
 | `GET /clawlens/api/cron/jobs` | Cron job list with run stats |
 | `GET /clawlens/api/cron/jobs/:id/runs` | Paginated run history for a job |
 | `GET /clawlens/api/cron/summary` | Aggregate cron summary |
+| `GET /clawlens/api/flow/events` | Live flow events (polling, `?since=` timestamp) |
+| `GET /clawlens/api/logs/stream` | Log stream (SSE) |
+| `GET /clawlens/api/memory/files` | List agent memory files |
+| `GET /clawlens/api/memory/history` | Snapshot history for a file |
+| `GET /clawlens/api/memory/diff` | Diff between two snapshots |
 
 ---
 
@@ -283,7 +339,7 @@ clawlens/
 │   │   └── package.json
 │   └── ui/              # React web UI (frontend)
 │       ├── src/
-│       │   ├── pages/   # Bots, SessionList, Replay, Analytics, CronJobs
+│       │   ├── pages/   # Bots, SessionList, Replay, Analytics, CronJobs, Flow, Logs, Memory
 │       │   ├── components/
 │       │   ├── hooks/
 │       │   ├── utils/   # Formatting utilities

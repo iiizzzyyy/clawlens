@@ -67,6 +67,9 @@ function ExportMenu({ sessionId }: { sessionId: string }) {
 export default function Replay() {
   const { sessionId } = useParams<{ sessionId: string }>();
 
+  // All hooks must be called before any conditional returns
+  const [view, setView] = useState<'timeline' | 'chat'>('timeline');
+
   // Try to fetch from API
   const { sessionTree: apiData, loading, error } = useSessionReplay(sessionId || '');
 
@@ -161,8 +164,6 @@ export default function Replay() {
       </div>
     );
   }
-
-  const [view, setView] = useState<'timeline' | 'chat'>('timeline');
 
   // Count turns and child spans
   const turnCount = sessionTree.children.filter((c) => c.spanType === 'turn').length;

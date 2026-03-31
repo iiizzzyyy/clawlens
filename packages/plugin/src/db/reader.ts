@@ -526,6 +526,24 @@ export class SpanReader {
 
     return row ? rowToSpan(row) : null;
   }
+
+  /**
+   * Get recent spans since a given timestamp, for live flow visualization.
+   */
+  getRecentSpans(sinceTs: number, limit = 100): Span[] {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT * FROM spans
+      WHERE start_ts > ?
+      ORDER BY start_ts DESC
+      LIMIT ?
+    `
+      )
+      .all(sinceTs, limit) as SpanRow[];
+
+    return rows.map(rowToSpan);
+  }
 }
 
 /**

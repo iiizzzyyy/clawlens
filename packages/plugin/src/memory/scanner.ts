@@ -5,7 +5,7 @@
  * and provides diff computation between snapshots.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, lstatSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -55,10 +55,27 @@ export function resolveWorkspaceRoot(configuredPath?: string): string {
 /**
  * Recursively scan a directory for .md files
  */
+/**
+ * Maximum files to process per scan (prevents choking on large workspaces)
+ */
+const MAX_SCAN_FILES = 500;
+
+/**
+ * Maximum file size to snapshot (skip very large files)
+ */
+const MAX_FILE_SIZE = 512 * 1024; // 512 KB
+
+/**
+ * Directories to skip during scanning (OpenClaw internals)
+ */
+const SKIP_DIRS = new Set(['node_modules', 'qmd', 'dist', 'build', '.git']);
+
 export function scanMarkdownFiles(rootDir: string): WorkspaceFile[] {
   const files: WorkspaceFile[] = [];
 
   function walk(dir: string): void {
+    if (files.length >= MAX_SCAN_FILES) return;
+
     let entries: string[];
     try {
       entries = readdirSync(dir);
@@ -68,20 +85,25 @@ export function scanMarkdownFiles(rootDir: string): WorkspaceFile[] {
     }
 
     for (const entry of entries) {
-      // Skip hidden directories and node_modules
-      if (entry.startsWith('.') || entry === 'node_modules') continue;
+      if (files.length >= MAX_SCAN_FILES) return;
+
+      // Skip hidden directories, node_modules, and OpenClaw internals
+      if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
 
       const fullPath = join(dir, entry);
       let stat;
       try {
-        stat = statSync(fullPath);
+        stat = lstatSync(fullPath);
       } catch {
         continue; // Skip files we can't stat
       }
 
+      // Skip symlinks to avoid circular references
+      if (stat.isSymbolicLink()) continue;
+
       if (stat.isDirectory()) {
         walk(fullPath);
-      } else if (stat.isFile() && entry.endsWith('.md')) {
+      } else if (stat.isFile() && entry.endsWith('.md') && stat.size <= MAX_FILE_SIZE) {
         files.push({
           path: relative(rootDir, fullPath),
           name: entry,
@@ -150,16 +172,21 @@ export function captureSnapshots(
   const now = Date.now();
 
   for (const file of files) {
-    const absolutePath = join(workspaceRoot, file.path);
-    const content = readFileSafe(absolutePath);
-    if (content === null) continue;
+    try {
+      const absolutePath = join(workspaceRoot, file.path);
+      const content = readFileSafe(absolutePath);
+      if (content === null) continue;
 
-    const hash = contentHash(content);
-    const latest = getLatest.get(file.path) as { content_hash: string } | undefined;
+      const hash = contentHash(content);
+      const latest = getLatest.get(file.path) as { content_hash: string } | undefined;
 
-    if (!latest || latest.content_hash !== hash) {
-      insert.run(file.path, hash, content, now);
-      captured++;
+      if (!latest || latest.content_hash !== hash) {
+        insert.run(file.path, hash, content, now);
+        captured++;
+      }
+    } catch {
+      // Skip files that fail to process (permissions, encoding, etc.)
+      continue;
     }
   }
 

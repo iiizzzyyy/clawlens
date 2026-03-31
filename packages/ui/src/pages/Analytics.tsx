@@ -3,9 +3,10 @@
  *
  * Grid of 8 pre-built investigative queries with charts.
  * Each card shows a specific analytics view with drill-down to sessions.
+ * Cards load sequentially to avoid overwhelming the backend.
  */
 
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart,
@@ -32,14 +33,28 @@ interface AnalyticsCardProps {
   chartType: 'bar' | 'line' | 'stacked';
   valueField: string;
   secondaryValueField?: string;
+  enabled: boolean;
+  onComplete: () => void;
 }
 
-function AnalyticsCard({ title, description, queryType, params, chartType, valueField, secondaryValueField }: AnalyticsCardProps) {
+function AnalyticsCard({ title, description, queryType, params, chartType, valueField, secondaryValueField, enabled, onComplete }: AnalyticsCardProps) {
   const navigate = useNavigate();
-  const { data, loading, error } = useAnalytics(queryType, params);
+  const { data, loading, error } = useAnalytics(queryType, params, enabled);
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (enabled && !loading && !notifiedRef.current) {
+      notifiedRef.current = true;
+      onComplete();
+    }
+  }, [enabled, loading, onComplete]);
+
+  // Reset notification when params change
+  useEffect(() => {
+    notifiedRef.current = false;
+  }, [JSON.stringify(params)]);
 
   const handleDataPointClick = (dataPoint: any) => {
-    // Navigate to session list filtered by this data point
     const filters: any = {};
     if (dataPoint.agentId) filters.agentId = dataPoint.agentId;
     if (dataPoint.channel) filters.channel = dataPoint.channel;
@@ -122,23 +137,23 @@ function AnalyticsCard({ title, description, queryType, params, chartType, value
       <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
       <p className="text-slate-400 text-sm mb-4">{description}</p>
 
-      {loading && (
+      {(!enabled || loading) && (
         <div className="text-center py-8 text-slate-400">Loading...</div>
       )}
 
-      {error && (
+      {enabled && error && (
         <div className="text-center py-8 text-red-400 bg-red-900/20 rounded">
           Error: {error.message}
         </div>
       )}
 
-      {!loading && !error && renderChart()}
+      {enabled && !loading && !error && renderChart()}
 
-      {!loading && !error && data && (
+      {enabled && !loading && !error && data?.data && (
         <div className="mt-4 text-xs text-slate-500">
           {data.data.length} result{data.data.length !== 1 ? 's' : ''}
-          {data.metadata.fromTs && data.metadata.toTs && (
-            <> • {new Date(data.metadata.fromTs).toLocaleDateString()} - {new Date(data.metadata.toTs).toLocaleDateString()}</>
+          {data.metadata?.fromTs && data.metadata?.toTs && (
+            <> &bull; {new Date(data.metadata.fromTs).toLocaleDateString()} - {new Date(data.metadata.toTs).toLocaleDateString()}</>
           )}
         </div>
       )}
@@ -146,11 +161,34 @@ function AnalyticsCard({ title, description, queryType, params, chartType, value
   );
 }
 
+const CARD_CONFIGS = [
+  { title: 'Cost by Agent + Model', description: 'Which agent/model combo is burning money?', queryType: 'cost_by_agent_model', chartType: 'bar' as const, valueField: 'totalCost' },
+  { title: 'Cost per Successful Task', description: 'Am I paying more for worse results?', queryType: 'cost_per_successful_task', chartType: 'bar' as const, valueField: 'costPerTask' },
+  { title: 'Tool Failure Rate', description: 'Which tool is the most unreliable?', queryType: 'tool_failure_rate', chartType: 'bar' as const, valueField: 'failureRate' },
+  { title: 'Retry Clustering', description: 'Where do retries concentrate? Same tool? Same agent?', queryType: 'retry_clustering', chartType: 'bar' as const, valueField: 'retryCount' },
+  { title: 'Latency Percentiles by Span Type', description: 'Is my bottleneck LLM inference or tool execution?', queryType: 'latency_percentiles', chartType: 'stacked' as const, valueField: 'p90', secondaryValueField: 'count' },
+  { title: 'Session Duration Distribution', description: 'Are conversations getting longer over time?', queryType: 'session_duration_distribution', chartType: 'bar' as const, valueField: 'count' },
+  { title: 'Error Hotspots by Channel', description: 'Is Telegram more error-prone than Slack?', queryType: 'error_hotspots_by_channel', chartType: 'bar' as const, valueField: 'errorRate' },
+  { title: 'Token Waste (Context Re-reads)', description: 'How much am I spending on re-reading history?', queryType: 'token_waste', chartType: 'bar' as const, valueField: 'rereadTokens' },
+] as const;
+
 function Analytics() {
   const [params, setParams] = useState<AnalyticsParams>({
     fromTs: Date.now() - 7 * 24 * 60 * 60 * 1000,
     toTs: Date.now(),
   });
+
+  // Load cards sequentially: track how many have completed
+  const [completedCount, setCompletedCount] = useState(0);
+
+  // Reset when params change
+  useEffect(() => {
+    setCompletedCount(0);
+  }, [JSON.stringify(params)]);
+
+  const handleCardComplete = useCallback(() => {
+    setCompletedCount((c) => c + 1);
+  }, []);
 
   return (
     <div>
@@ -163,86 +201,20 @@ function Analytics() {
       <QueryBuilder onParamsChange={setParams} defaultTimeRange="week" />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(500px,1fr))] gap-6">
-        {/* Query 1: Cost by Agent + Model */}
-        <AnalyticsCard
-          title="Cost by Agent + Model"
-          description="Which agent/model combo is burning money?"
-          queryType="cost_by_agent_model"
-          params={params}
-          chartType="bar"
-          valueField="totalCost"
-        />
-
-        {/* Query 2: Cost per Successful Task */}
-        <AnalyticsCard
-          title="Cost per Successful Task"
-          description="Am I paying more for worse results?"
-          queryType="cost_per_successful_task"
-          params={params}
-          chartType="bar"
-          valueField="costPerTask"
-        />
-
-        {/* Query 3: Tool Failure Rate */}
-        <AnalyticsCard
-          title="Tool Failure Rate"
-          description="Which tool is the most unreliable?"
-          queryType="tool_failure_rate"
-          params={params}
-          chartType="bar"
-          valueField="failureRate"
-        />
-
-        {/* Query 4: Retry Clustering */}
-        <AnalyticsCard
-          title="Retry Clustering"
-          description="Where do retries concentrate? Same tool? Same agent?"
-          queryType="retry_clustering"
-          params={params}
-          chartType="bar"
-          valueField="retryCount"
-        />
-
-        {/* Query 5: Latency Percentiles */}
-        <AnalyticsCard
-          title="Latency Percentiles by Span Type"
-          description="Is my bottleneck LLM inference or tool execution?"
-          queryType="latency_percentiles"
-          params={params}
-          chartType="stacked"
-          valueField="p90"
-          secondaryValueField="count"
-        />
-
-        {/* Query 6: Session Duration Distribution */}
-        <AnalyticsCard
-          title="Session Duration Distribution"
-          description="Are conversations getting longer over time?"
-          queryType="session_duration_distribution"
-          params={params}
-          chartType="bar"
-          valueField="count"
-        />
-
-        {/* Query 7: Error Hotspots by Channel */}
-        <AnalyticsCard
-          title="Error Hotspots by Channel"
-          description="Is Telegram more error-prone than Slack?"
-          queryType="error_hotspots_by_channel"
-          params={params}
-          chartType="bar"
-          valueField="errorRate"
-        />
-
-        {/* Query 8: Token Waste */}
-        <AnalyticsCard
-          title="Token Waste (Context Re-reads)"
-          description="How much am I spending on re-reading history?"
-          queryType="token_waste"
-          params={params}
-          chartType="bar"
-          valueField="rereadTokens"
-        />
+        {CARD_CONFIGS.map((config, index) => (
+          <AnalyticsCard
+            key={config.queryType}
+            title={config.title}
+            description={config.description}
+            queryType={config.queryType}
+            params={params}
+            chartType={config.chartType}
+            valueField={config.valueField}
+            secondaryValueField={'secondaryValueField' in config ? config.secondaryValueField : undefined}
+            enabled={index <= completedCount}
+            onComplete={handleCardComplete}
+          />
+        ))}
       </div>
     </div>
   );

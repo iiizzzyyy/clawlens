@@ -9,7 +9,7 @@ import type Database from 'better-sqlite3';
 /**
  * Current schema version - increment when making schema changes
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * DDL for spans table - the core data store

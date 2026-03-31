@@ -177,9 +177,19 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(errorMessage, errorCode, response.status);
   }
 
-  const apiResponse = (await response.json()) as ApiResponse<T>;
+  let apiResponse: ApiResponse<T>;
+  try {
+    apiResponse = (await response.json()) as ApiResponse<T>;
+  } catch {
+    throw new ApiError('Invalid JSON response from server', 'JSON_PARSE_ERROR');
+  }
+
   if (apiResponse.error) {
     throw new ApiError(apiResponse.error.message, apiResponse.error.code);
+  }
+
+  if (apiResponse.data === undefined || apiResponse.data === null) {
+    throw new ApiError('Empty response from server', 'EMPTY_RESPONSE');
   }
 
   return apiResponse.data;

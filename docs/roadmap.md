@@ -135,6 +135,45 @@ Pre-built analytics queries:
 
 ---
 
+## V1.3 — Real-Time & Memory
+
+### Status: ✅ Complete (March 2026)
+
+#### ✅ Live Flow Dashboard (Redesigned)
+
+- [x] Stats strip with live counters (active sessions, cost, tokens, errors, avg latency)
+- [x] Per-agent cards with LLM/tool counts, model badge, cost sparkline, active/idle status
+- [x] Enriched event feed with color-coded span types, duration, cost per event
+- [x] Detail panel with full span info and action buttons (Open Replay, Filter Agent/Session/Type)
+- [x] Filter bar for narrowing by agent, session, or span type
+- [x] Database-backed events (queries recent spans, not just in-memory hook events)
+- [x] Polling-based transport (2s interval) for gateway compatibility
+
+#### ✅ Memory Browser
+
+- [x] File tree sidebar with navigable directory structure
+- [x] Content viewer for agent workspace files
+- [x] Snapshot history timeline
+- [x] Diff viewer to compare snapshots
+
+#### ✅ Log Viewer
+
+- [x] Color-coded live log stream (error, warn, info, debug)
+- [x] Filter by log level, agent, and text search
+- [x] Auto-scroll with manual override
+- [x] SSE-based streaming
+
+#### ✅ Chat Transcript View
+
+- [x] Chat-bubble transcript viewer in Session Replay
+- [x] Toggle between Timeline and Chat views
+
+#### Remaining (Non-Code)
+
+- [ ] Screenshots for Live Flow, Logs, Memory Browser, Cron Jobs pages
+
+---
+
 ## V2 — Community-Driven Enhancements
 
 V2 features will be prioritized based on **real user feedback** and **adoption metrics**. The features below are candidates, not commitments.
@@ -408,6 +447,7 @@ These features have been considered and **will not** be added to ClawLens:
 - **V1**: ✅ Complete (beta released)
 - **V1.1**: ✅ Complete (March 2026)
 - **V1.2**: ✅ Complete (March 2026)
+- **V1.3**: ✅ Complete (March 2026) — Live Flow Dashboard, Memory Browser, Logs, Chat Transcript
 - **V2.0**: Q2 2026 (first V2 feature based on feedback)
 - **V2.1+**: Every 6-8 weeks
 

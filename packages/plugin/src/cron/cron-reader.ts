@@ -84,7 +84,7 @@ export function readCronJobs(logger: Logger): CronJob[] {
 
     const raw = readFileSync(jobsPath, 'utf-8');
     const parsed = JSON.parse(raw);
-    const jobs: CronJob[] = Array.isArray(parsed.jobs) ? parsed.jobs : [];
+    const jobs: CronJob[] = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.jobs) ? parsed.jobs : []);
     jobsCache = { data: jobs, readAt: now };
     return jobs;
   } catch (error) {
