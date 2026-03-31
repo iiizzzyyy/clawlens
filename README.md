@@ -3,7 +3,6 @@
 > **The investigation layer for OpenClaw** — understand _why_ your agents behave the way they do
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/iiizzzyyy/clawlens/ci.yml?branch=main)](https://github.com/iiizzzyyy/clawlens/actions)
 
 ---
 
