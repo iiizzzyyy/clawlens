@@ -80,6 +80,15 @@ function AnalyticsCard({ title, description, queryType, params, chartType, value
       ...(secondaryValueField ? { count: item[secondaryValueField] } : {}),
     }));
 
+    const allZero = chartData.every((item: any) => !item.value || item.value === 0);
+    if (allZero) {
+      return (
+        <div className="h-[200px] flex items-center justify-center text-slate-500 text-sm">
+          All values are zero for this period
+        </div>
+      );
+    }
+
     const COLORS = ['#ff5c5c', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
     if (chartType === 'bar') {
