@@ -283,23 +283,227 @@ clawlens:
 
 ClawLens exposes a REST API at `/clawlens/api/`:
 
+### Authentication
+
+All API endpoints require the OpenClaw gateway token. Get it from your config:
+
+```bash
+TOKEN=$(cat ~/.openclaw/openclaw.json | python3 -c "import sys,json; print(json.load(sys.stdin)['gateway']['auth']['token'])")
+```
+
+Include it in every request:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:18789/clawlens/api/sessions
+```
+
+### Endpoints
+
+#### Sessions
+
 | Endpoint | Description |
 |----------|-------------|
-| `GET /clawlens/api/bots` | Agent overview (supports `fromTs`, `toTs` params) |
-| `GET /clawlens/api/sessions` | Session list (supports filtering and pagination) |
-| `GET /clawlens/api/sessions/:id/replay` | Full session span tree for replay |
+| `GET /clawlens/api/sessions?limit=50&agent=main&status=ok` | List sessions with filtering |
+| `GET /clawlens/api/sessions/:id` | Get full session with turns and spans |
+| `GET /clawlens/api/sessions/:id/replay` | Session span tree for replay UI |
 | `GET /clawlens/api/sessions/:id/summary` | Session summary stats |
-| `GET /clawlens/api/sessions/:id/export` | Export session as HTML or JSON (`?format=html\|json`) |
-| `GET /clawlens/api/analytics/:queryType` | Analytics queries (15+ query types) |
+| `GET /clawlens/api/sessions/:id/export?format=html` | Export as HTML or JSON |
+
+**Query Parameters:**
+- `limit` (default: 50) — Max sessions to return
+- `offset` (default: 0) — Pagination offset
+- `agent` — Filter by agent ID (e.g., `main`, `scout`)
+- `status` — Filter by status (`ok`, `error`)
+- `fromTs`, `toTs` — Timestamp range (milliseconds since epoch)
+
+**Example:**
+```bash
+# Get recent sessions for main agent
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/sessions?agent=main&limit=5"
+
+# Export a session as HTML
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/sessions/SESSION_ID/export?format=html" \
+  -o session.html
+```
+
+#### Analytics
+
+| Endpoint | Description |
+|----------|-------------|
 | `GET /clawlens/api/analytics` | List available query types |
-| `GET /clawlens/api/cron/jobs` | Cron job list with run stats |
-| `GET /clawlens/api/cron/jobs/:id/runs` | Paginated run history for a job |
-| `GET /clawlens/api/cron/summary` | Aggregate cron summary |
-| `GET /clawlens/api/flow/events` | Live flow events (polling, `?since=` timestamp) |
-| `GET /clawlens/api/logs/stream` | Log stream (SSE) |
-| `GET /clawlens/api/memory/files` | List agent memory files |
-| `GET /clawlens/api/memory/history` | Snapshot history for a file |
-| `GET /clawlens/api/memory/diff` | Diff between two snapshots |
+| `GET /clawlens/api/analytics/:queryType?group_by=agent&days=7` | Run analytics query |
+
+**Query Types:** `cost_by_agent`, `cost_by_model`, `tool_failure_rate`, `latency_percentiles`, `token_waste`, `retry_clusters`, `cost_per_task`
+
+**Query Parameters:**
+- `group_by` — Group results by: `agent`, `model`, `channel`, `date`
+- `days` — Time range in days (default: 7)
+- `fromTs`, `toTs` — Custom timestamp range
+
+**Example:**
+```bash
+# Get cost breakdown by agent (last 7 days)
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/analytics/cost_by_agent?days=7"
+
+# Get tool failure rates grouped by model
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/analytics/tool_failure_rate?group_by=model"
+```
+
+#### Live Monitoring
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /clawlens/api/flow/events?since=0` | Poll for recent agent activity |
+| `GET /clawlens/api/logs/stream?level=error&agent=main` | SSE log streaming |
+
+**Flow Events:**
+- `since` — Get events after this timestamp (ms)
+- Returns events from both in-memory bus and database
+- Poll every 2-5 seconds for real-time updates
+
+**Log Streaming:**
+- `level` — Filter by log level: `error`, `warn`, `info`, `debug`
+- `agent` — Filter by agent ID
+- `search` — Free-text search in log messages
+- Uses Server-Sent Events (SSE)
+
+**Example:**
+```bash
+# Poll for recent events
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/flow/events?since=$(date +%s)000"
+
+# Stream error logs for main agent
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/logs/stream?level=error&agent=main"
+```
+
+#### Topology
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /clawlens/api/topology` | Agent network graph and relationships |
+
+Returns nodes (agents) with stats and edges (delegation relationships).
+
+**Example:**
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/topology" | python3 -m json.tool
+```
+
+#### Memory
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /clawlens/api/memory/files` | List agent memory markdown files |
+| `GET /clawlens/api/memory/history?path=memory/2026-04-18.md` | Snapshot history for a file |
+| `GET /clawlens/api/memory/diff?path=...&before=...&after=...` | Compare two snapshots |
+
+**Example:**
+```bash
+# List all memory files
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/memory/files"
+
+# Get history of a specific file
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/memory/history?path=memory/2026-04-18.md"
+```
+
+#### Cron Jobs
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /clawlens/api/cron/jobs` | List scheduled jobs with stats |
+| `GET /clawlens/api/cron/jobs/:id/runs?limit=20` | Paginated run history |
+| `GET /clawlens/api/cron/summary` | Aggregate summary (success rate, next runs) |
+
+**Example:**
+```bash
+# List all cron jobs
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/cron/jobs"
+
+# Get summary
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/cron/summary"
+```
+
+#### Bots
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /clawlens/api/bots?fromTs=...&toTs=...` | Agent overview with stats |
+
+Returns all configured agents with session counts, token usage, costs, error rates, and relationship data.
+
+**Query Parameters:**
+- `fromTs`, `toTs` — Timestamp range for stats (ms)
+
+**Example:**
+```bash
+# Get bot stats for last 24 hours
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18789/clawlens/api/bots?fromTs=$(($(date +%s)-86400))000"
+```
+
+### Response Format
+
+All endpoints return JSON with this structure:
+
+```json
+{
+  "data": { ... },
+  "error": null
+}
+```
+
+On error:
+
+```json
+{
+  "data": null,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Session not found"
+  }
+}
+```
+
+### Rate Limiting
+
+The API runs inside the OpenClaw gateway with no hard rate limits. However:
+- Poll `/flow/events` every 2-5 seconds, not faster
+- Use `limit` and `offset` for pagination on large result sets
+- Analytics queries are cached; repeated identical queries are fast
+
+### Using in Scripts
+
+```python
+#!/usr/bin/env python3
+import json
+import urllib.request
+from pathlib import Path
+
+# Get token
+config = json.loads(Path.home().joinpath('.openclaw/openclaw.json').read_text())
+token = config['gateway']['auth']['token']
+
+# Query sessions
+req = urllib.request.Request(
+    'http://localhost:18789/clawlens/api/sessions?limit=10',
+    headers={'Authorization': f'Bearer {token}'}
+)
+with urllib.request.urlopen(req) as resp:
+    data = json.loads(resp.read())
+    for session in data['data']:
+        print(f"{session['agentId']}: {session['totalCost']:.4f} USD")
+```
 
 ---
 
